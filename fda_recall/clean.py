@@ -32,7 +32,7 @@ import re
 from datetime import date
 from itertools import groupby
 
-from . import db, detection, distribution, products as product_text, quantity, reasons
+from . import db, detection, distribution, products as product_text, quantity, reasons, usda
 
 # Values the FDA uses to mean "no value".
 PLACEHOLDERS = {"", "N/A", "NA", "n/a", "N/a", "None", "none"}
@@ -94,7 +94,10 @@ CREATE TABLE events (
     is_foreign              INTEGER NOT NULL,
     is_online               INTEGER NOT NULL,
     state_count             INTEGER NOT NULL,
-    illness_reported        INTEGER NOT NULL
+    illness_reported        INTEGER NOT NULL,
+    agency                  TEXT NOT NULL,   -- 'FDA' or 'USDA'
+    recall_type             TEXT NOT NULL,   -- 'recall' or 'public_health_alert' (USDA only)
+    source_url              TEXT             -- the agency's notice page, where there is one
 );
 
 CREATE TABLE event_states (
@@ -201,6 +204,74 @@ def date_issue(value):
     return None
 
 
+def usda_rows(conn):
+    """Clean-layer rows for every USDA FSIS notice in usda_recalls.
+
+    Each notice becomes one event ("USDA-<number>") with one product row
+    carrying the FSIS number. The shared text rules only see the parts of the
+    notice that vary (see usda.notice_parts), never FSIS's boilerplate.
+    """
+    out = []
+    for number, raw in conn.execute("SELECT recall_number, raw_json FROM usda_recalls ORDER BY recall_number"):
+        rec = json.loads(raw)
+        p = usda.notice_parts(rec)
+        event_id = f"USDA-{number}"
+        classification = rec.get("recall_classification")
+        firm = p["firm"] or ("Firm not named (public health alert)" if p["is_alert"] else "Firm not named")
+        states, nationwide, foreign, online = distribution.parse_distribution(p["distribution"])
+        parsed_qty = quantity.parse_quantity(p["quantity"])
+        units = parsed_qty[0] if parsed_qty else None
+        illness = p["outbreak"] or detection.illness_reported(p["illness_text"])
+
+        tags = reasons.tag_reason(p["reason"])
+        if reasons.primary_category(tags) == "other":  # fall back to FSIS's own reason field
+            tags = sorted({usda.FSIS_REASON_TAGS[r] for r in rec.get("recall_reason") or [] if r in usda.FSIS_REASON_TAGS})
+        first_item = (p["product_description"] or "").split("\n")[0]
+        category = product_text.product_category(first_item) or "meat_poultry"  # FSIS's remit
+        date_ = rec.get("recall_date")
+
+        fields = {
+            "recalling_firm": firm, "address_1": None, "address_2": None, "city": None,
+            "state": p["state"], "postal_code": None, "country": p["country"] or ("United States" if p["state"] else None),
+            "voluntary_mandated": None, "initial_firm_notification": None,
+            "distribution_pattern": p["distribution"], "recall_initiation_date": date_, "report_date": date_,
+        }
+        event = (
+            event_id, firm_key(firm), *(fields[f] for f in EVENT_FIELDS),
+            1,
+            classification if classification in CLASS_SEVERITY else None,
+            int(p["ongoing"]),
+            units, quantity.size_bucket(units),
+            int(nationwide), int(foreign or (p["country"] not in (None, "United States"))), int(online),
+            len(states), int(illness),
+            "USDA", "public_health_alert" if p["is_alert"] else "recall", rec.get("recall_url"),
+        )
+        product_fields = {
+            "status": "Ongoing" if p["ongoing"] else "Terminated",
+            "classification": classification,
+            "product_type": "Meat, poultry and egg products",
+            "product_description": p["product_description"],
+            "product_quantity": p["quantity"],
+            "reason_for_recall": p["reason"],
+            "code_info": None, "more_code_info": None,
+            "center_classification_date": None,
+            "termination_date": None,  # FSIS only records the year a recall closed
+        }
+        product = (
+            number, event_id, *(product_fields[f] for f in PRODUCT_FIELDS),
+            reasons.primary_category(tags),
+            *(parsed_qty or (None, None, None)),
+            category, int(illness),
+        )
+        out.append({
+            "event_id": event_id, "recall_number": number, "event": event, "product": product,
+            "states": states, "nationwide": nationwide, "tags": tags,
+            "sources": usda.fsis_detection_sources(p["discovery"]),
+            "upcs": product_text.find_upcs(p["product_description"]), "illness": bool(illness),
+        })
+    return out
+
+
 def rebuild(conn):
     """Drop and recreate the clean tables from `recalls`. Returns row counts."""
     raw_fields = ["recall_number", "event_id", *EVENT_FIELDS, *PRODUCT_FIELDS]
@@ -239,7 +310,7 @@ def rebuild(conn):
         records.append(rec)
 
     events, event_states = [], []
-    unsized_events = events_without_location = untagged_products = 0
+    unsized_events = events_without_location = untagged_products = illness_events = usda_events = 0
     for event_id, group in groupby(records, key=lambda r: r["event_id"]):
         group = list(group)
         if event_id is None:
@@ -267,9 +338,11 @@ def rebuild(conn):
             int(online),
             len(states),
             int(any(rec["illness_reported"] for rec in group)),
+            "FDA", "recall", None,
         ))
         unsized_events += units is None
         events_without_location += not states and not nationwide
+        illness_events += any(rec["illness_reported"] for rec in group)
 
     # Many products share the same reason text, so cache per text.
     reason_cache = {}
@@ -292,6 +365,22 @@ def rebuild(conn):
         reason_tags.extend((number, c, d) for c, d in tags)
         detection_rows.extend((number, s) for s in sources)
         upc_rows.extend((number, upc) for upc in product_text.find_upcs(rec["product_description"]))
+
+    # USDA FSIS notices: one event + one product row each, so every shared
+    # table and endpoint works for both agencies.
+    for u in usda_rows(conn):
+        event_id, number = u["event_id"], u["recall_number"]
+        events.append(u["event"])
+        event_states.extend((event_id, s) for s in u["states"])
+        products.append(u["product"])
+        reason_tags.extend((number, c, d) for c, d in u["tags"])
+        detection_rows.extend((number, s) for s in u["sources"])
+        upc_rows.extend((number, upc) for upc in u["upcs"])
+        untagged_products += u["product"][len(PRODUCT_FIELDS) + 2] == "other"
+        unsized_events += u["event"][len(EVENT_FIELDS) + 5] is None
+        events_without_location += not u["states"] and not u["nationwide"]
+        illness_events += u["illness"]
+        usda_events += 1
 
     with conn:
         conn.executescript(SCHEMA)
@@ -317,7 +406,8 @@ def rebuild(conn):
         "uncategorized_products": sum(p[-2] is None for p in products),
         "unsized_events": unsized_events,
         "events_without_location": events_without_location,
-        "illness_events": sum(e[-1] for e in events),
+        "illness_events": illness_events,
+        "usda_events": usda_events,
         "upcs": len(upc_rows),
         "data_issues": len(issues),
     }
@@ -336,7 +426,8 @@ def main(argv=None):
 
 def print_summary(counts):
     print(
-        f"Clean tables rebuilt: {counts['events']} events, {counts['products']} products, {counts['upcs']} UPCs,"
+        f"Clean tables rebuilt: {counts['events']} events ({counts['usda_events']} USDA),"
+        f" {counts['products']} products, {counts['upcs']} UPCs,"
         f" {counts['illness_events']} events with illnesses reported, {counts['data_issues']} data issues\n"
         f"  not classified: {counts['untagged_products']} products without a recall reason category,"
         f" {counts['uncategorized_products']} without a product category,"

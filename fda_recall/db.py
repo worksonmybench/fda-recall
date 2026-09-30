@@ -70,6 +70,26 @@ CREATE TABLE IF NOT EXISTS recall_history (
     PRIMARY KEY (recall_number, replaced_in_run)
 );
 
+-- USDA FSIS recalls and public health alerts, from sources/usda/fsis_recalls.json
+-- (see usda.py). Same change tracking as recalls; fields stay in raw_json.
+CREATE TABLE IF NOT EXISTS usda_recalls (
+    recall_number       TEXT PRIMARY KEY,
+    recall_date         TEXT,
+    recall_type         TEXT,
+    raw_json            TEXT NOT NULL,
+    content_hash        TEXT NOT NULL,
+    first_seen_run      INTEGER NOT NULL REFERENCES load_runs(run_id),
+    last_seen_run       INTEGER NOT NULL REFERENCES load_runs(run_id),
+    last_changed_run    INTEGER NOT NULL REFERENCES load_runs(run_id)
+);
+
+CREATE TABLE IF NOT EXISTS usda_recall_history (
+    recall_number       TEXT NOT NULL,
+    replaced_in_run     INTEGER NOT NULL REFERENCES load_runs(run_id),
+    raw_json            TEXT NOT NULL,
+    PRIMARY KEY (recall_number, replaced_in_run)
+);
+
 CREATE INDEX IF NOT EXISTS ix_recalls_event          ON recalls(event_id);
 CREATE INDEX IF NOT EXISTS ix_recalls_firm           ON recalls(recalling_firm);
 CREATE INDEX IF NOT EXISTS ix_recalls_classification ON recalls(classification);

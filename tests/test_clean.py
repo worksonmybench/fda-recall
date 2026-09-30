@@ -72,7 +72,8 @@ class RebuildTests(unittest.TestCase):
             counts,
             {
                 "events": 2, "products": 3, "reason_tags": 3, "untagged_products": 0, "uncategorized_products": 0,
-                "unsized_events": 0, "events_without_location": 0, "illness_events": 0, "upcs": 0, "data_issues": 0,
+                "unsized_events": 0, "events_without_location": 0, "illness_events": 0, "usda_events": 0, "upcs": 0,
+                "data_issues": 0,
             },
         )
         tags = set(conn.execute("SELECT p.reason_category, t.detail FROM products p JOIN product_reason_tags t USING (recall_number)"))

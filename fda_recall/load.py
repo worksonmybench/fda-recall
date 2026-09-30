@@ -17,7 +17,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import clean, db
+from . import clean, db, usda
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 
@@ -125,16 +125,66 @@ def load_document(conn, name, raw_bytes):
     return run_id, len(results), counts
 
 
+def load_usda_document(conn, name, raw_bytes):
+    """Upsert the committed USDA FSIS file (see usda.py) into usda_recalls."""
+    doc = json.loads(raw_bytes)
+    records = doc["records"]
+    cur = conn.execute(
+        "INSERT INTO load_runs (loaded_at, source_file, source_sha256, source_last_updated, record_count)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (datetime.now(timezone.utc).isoformat(timespec="seconds"), name,
+         hashlib.sha256(raw_bytes).hexdigest(), doc.get("fetched_at"), len(records)),
+    )
+    run_id = cur.lastrowid
+    existing = dict(conn.execute("SELECT recall_number, content_hash FROM usda_recalls"))
+    counts = {"inserted": 0, "updated": 0, "unchanged": 0}
+    for rec in records:
+        raw_json = json.dumps(rec, sort_keys=True, ensure_ascii=False)
+        content_hash = hashlib.sha256(raw_json.encode("utf-8")).hexdigest()
+        number = rec["recall_number"]
+        old_hash = existing.get(number)
+        if old_hash == content_hash:
+            counts["unchanged"] += 1
+            conn.execute("UPDATE usda_recalls SET last_seen_run = ? WHERE recall_number = ?", (run_id, number))
+            continue
+        if old_hash is None:
+            counts["inserted"] += 1
+        else:
+            counts["updated"] += 1
+            conn.execute(
+                "INSERT INTO usda_recall_history (recall_number, replaced_in_run, raw_json)"
+                " SELECT recall_number, ?, raw_json FROM usda_recalls WHERE recall_number = ?",
+                (run_id, number),
+            )
+        conn.execute(
+            "INSERT INTO usda_recalls (recall_number, recall_date, recall_type, raw_json, content_hash,"
+            " first_seen_run, last_seen_run, last_changed_run) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(recall_number) DO UPDATE SET recall_date = excluded.recall_date,"
+            " recall_type = excluded.recall_type, raw_json = excluded.raw_json,"
+            " content_hash = excluded.content_hash, last_seen_run = excluded.last_seen_run,"
+            " last_changed_run = excluded.last_changed_run",
+            (number, rec.get("recall_date"), rec.get("recall_type"), raw_json, content_hash, run_id, run_id, run_id),
+        )
+        existing[number] = content_hash
+    conn.execute(
+        "UPDATE load_runs SET inserted = ?, updated = ?, unchanged = ? WHERE run_id = ?",
+        (counts["inserted"], counts["updated"], counts["unchanged"], run_id),
+    )
+    return run_id, len(records), counts
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("files", nargs="*", type=Path, help="openFDA .json or .zip exports")
     parser.add_argument("--db", type=Path, default=db.DEFAULT_DB, help=f"SQLite file (default: {db.DEFAULT_DB})")
+    parser.add_argument("--usda", type=Path, default=usda.DEFAULT_PATH,
+                        help=f"committed USDA FSIS file, loaded if present (default: {usda.DEFAULT_PATH})")
     args = parser.parse_args(argv)
 
     files = args.files or sorted(
         p for p in PROJECT_DIR.iterdir() if p.suffix.lower() in (".json", ".zip")
     )
-    if not files:
+    if not files and not args.usda.exists():
         parser.error(f"no .json or .zip files found in {PROJECT_DIR}")
 
     conn = db.connect(args.db)
@@ -148,6 +198,14 @@ def main(argv=None):
                     f"  run {run_id}: {total} records -> {counts['inserted']} new,"
                     f" {counts['updated']} changed, {counts['unchanged']} unchanged"
                 )
+        if args.usda.exists():
+            print(f"Loading {args.usda.name} (USDA FSIS) ...")
+            with conn:
+                run_id, total, counts = load_usda_document(conn, args.usda.name, args.usda.read_bytes())
+            print(
+                f"  run {run_id}: {total} records -> {counts['inserted']} new,"
+                f" {counts['updated']} changed, {counts['unchanged']} unchanged"
+            )
         clean.print_summary(clean.rebuild(conn))
     finally:
         conn.close()
