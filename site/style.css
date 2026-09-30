@@ -97,7 +97,7 @@ main.loading { opacity: 0.55; transition: opacity 120ms; }
 .tile .sub { color: var(--text-muted); font-size: 12px; }
 
 .card { padding: 16px; margin-bottom: 16px; min-width: 0; }
-.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; }
 .grid-2 .card { margin-bottom: 0; }
 .grid-2 { margin-bottom: 16px; }
 
@@ -147,39 +147,41 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .tooltip .linekey { width: 12px; height: 2px; border-radius: 1px; display: inline-block; }
 
 /* --- map ------------------------------------------------------------------ */
-/* Sequential blue, binned. Light: low = light. Dark: anchor flips, low = dark.
-   --seq-0 is "none"; --seq-ink-N is the label color that clears contrast on step N. */
+/* Sequential red, binned: more ongoing recalls = redder, near-white -> deep red in both
+   light and dark mode (dark mode's top step is a touch brighter so it stays visible).
+   --seq-0 is "none" (neutral gray); --seq-ink-N is the label color that clears contrast on step N.
+   --seq-5-strong is the blue control fill (toggle, pager), deliberately not part of the ramp. */
 .viz-root {
   --seq-0: #f0efec; --seq-ink-0: #52514e;
   --seq-5-strong: #256abf; /* selected-control fill: white text clears 4.5:1 */
-  --seq-1: #b7d3f6; --seq-ink-1: #0b0b0b;
-  --seq-2: #9ec5f4; --seq-ink-2: #0b0b0b;
-  --seq-3: #6da7ec; --seq-ink-3: #0b0b0b;
-  --seq-4: #3987e5; --seq-ink-4: #0b0b0b;
-  --seq-5: #256abf; --seq-ink-5: #ffffff;
-  --seq-6: #104281; --seq-ink-6: #ffffff;
+  --seq-1: #fde4df; --seq-ink-1: #0b0b0b;
+  --seq-2: #f9b9ad; --seq-ink-2: #0b0b0b;
+  --seq-3: #f2877a; --seq-ink-3: #0b0b0b;
+  --seq-4: #e34948; --seq-ink-4: #0b0b0b;
+  --seq-5: #b8302f; --seq-ink-5: #ffffff;
+  --seq-6: #7f1d1d; --seq-ink-6: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) .viz-root {
     --seq-0: #383835; --seq-ink-0: #c3c2b7;
     --seq-5-strong: #1c5cab;
-    --seq-1: #104281; --seq-ink-1: #ffffff;
-    --seq-2: #1c5cab; --seq-ink-2: #ffffff;
-    --seq-3: #2a78d6; --seq-ink-3: #ffffff;
-    --seq-4: #5598e7; --seq-ink-4: #0b0b0b;
-    --seq-5: #86b6ef; --seq-ink-5: #0b0b0b;
-    --seq-6: #b7d3f6; --seq-ink-6: #0b0b0b;
+    --seq-1: #fde4df; --seq-ink-1: #0b0b0b;
+    --seq-2: #f9b9ad; --seq-ink-2: #0b0b0b;
+    --seq-3: #f2877a; --seq-ink-3: #0b0b0b;
+    --seq-4: #e34948; --seq-ink-4: #0b0b0b;
+    --seq-5: #b8302f; --seq-ink-5: #ffffff;
+    --seq-6: #962424; --seq-ink-6: #ffffff; /* light mode's #7f1d1d would blur into the dark page */
   }
 }
 :root[data-theme="dark"] .viz-root {
   --seq-0: #383835; --seq-ink-0: #c3c2b7;
   --seq-5-strong: #1c5cab;
-  --seq-1: #104281; --seq-ink-1: #ffffff;
-  --seq-2: #1c5cab; --seq-ink-2: #ffffff;
-  --seq-3: #2a78d6; --seq-ink-3: #ffffff;
-  --seq-4: #5598e7; --seq-ink-4: #0b0b0b;
-  --seq-5: #86b6ef; --seq-ink-5: #0b0b0b;
-  --seq-6: #b7d3f6; --seq-ink-6: #0b0b0b;
+  --seq-1: #fde4df; --seq-ink-1: #0b0b0b;
+  --seq-2: #f9b9ad; --seq-ink-2: #0b0b0b;
+  --seq-3: #f2877a; --seq-ink-3: #0b0b0b;
+  --seq-4: #e34948; --seq-ink-4: #0b0b0b;
+  --seq-5: #b8302f; --seq-ink-5: #ffffff;
+  --seq-6: #962424; --seq-ink-6: #ffffff; /* light mode's #7f1d1d would blur into the dark page */
 }
 .map { display: flex; justify-content: center; }
 .tile-map .tile { cursor: pointer; outline: none; }
@@ -284,3 +286,8 @@ table.results .snippet { color: var(--text-secondary); font-size: 12px; margin-t
 .pager button[aria-current="page"] { background: var(--seq-5-strong); color: #ffffff; border-color: transparent; font-weight: 600; }
 .header-links { display: flex; gap: 16px; font-size: 14px; margin-top: 6px; }
 .more-link { font-size: 14px; margin: 10px 0 0; }
+/* Very narrow screens: stack fact labels above their values. */
+@media (max-width: 420px) {
+  .facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .facts dd { margin-bottom: 8px; }
+}

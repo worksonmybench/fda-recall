@@ -53,6 +53,14 @@ export function computeBins(values) {
 
 const binOf = (v, bounds) => (v <= 0 ? 0 : bounds.findIndex((b) => v < b) + 1);
 
+/** Ramp step (--seq-N) for a bin, spreading however many bins there are across
+ *  the whole ramp so the top bin is always the strongest color. */
+const stepOf = (bin, bounds) => {
+  if (bin === 0) return 0;
+  if (bounds.length <= 1) return BINS;
+  return Math.round(1 + ((bin - 1) * (BINS - 1)) / (bounds.length - 1));
+};
+
 export function binLabels(bounds) {
   let lo = 1;
   return bounds.map((hi) => {
@@ -85,7 +93,7 @@ export function renderTileMap(container, { states, view, selected, metric = "ong
     const info = states[code];
     if (!info) return;
     const stats = info[view];
-    const bin = binOf(values[i], bounds);
+    const bin = stepOf(binOf(values[i], bounds), bounds);
     const x = col * (size + gap);
     const y = row * (size + gap);
     const g = el("g", {
@@ -138,7 +146,7 @@ export function renderTileMap(container, { states, view, selected, metric = "ong
 }
 
 export function renderMapLegend(container, bounds) {
-  const items = [["0", 0], ...binLabels(bounds).map((text, i) => [text, i + 1])];
+  const items = [["0", 0], ...binLabels(bounds).map((text, i) => [text, stepOf(i + 1, bounds)])];
   container.replaceChildren(
     ...items.map(([text, bin]) => {
       const key = document.createElement("span");
@@ -157,7 +165,7 @@ export const MAP_CODES = LAYOUT.map(([code]) => code);
 /** Small static map highlighting the states one recall reached. */
 export function renderReachMap(container, { states = [], nationwide = false, names = {} }) {
   const reached = new Set(states);
-  const width = Math.min(420, Math.max(240, container.clientWidth));
+  const width = Math.min(420, Math.max(120, container.clientWidth));
   const gap = 2;
   const size = Math.floor((width - gap * (COLS - 1)) / COLS);
   const mapW = size * COLS + gap * (COLS - 1);
