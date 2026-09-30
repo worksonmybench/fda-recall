@@ -36,7 +36,9 @@ Fields openFDA adds later are kept in `raw_json` and reported during the load, s
 
 | table | contents |
 |---|---|
-| `events` | one row per recall event: firm, address, distribution, initiation/report dates, plus `firm_key`, `product_count`, `most_severe_class`, `ongoing_product_count`, `est_units`, `size` |
+| `events` | one row per recall event: firm, address, distribution, initiation/report dates, plus `firm_key`, `product_count`, `most_severe_class`, `ongoing_product_count`, `est_units`, `size`, `is_nationwide`, `is_foreign`, `is_online`, `state_count` |
+| `event_states` | the US states / territories (2-letter codes) named in each event's `distribution_pattern` |
+| `event_state_reach` (view) | `event_states` plus all 50 states + DC for nationwide events; `via_nationwide` = 1 for those added rows |
 | `products` | one row per recall number (product), linked by `event_id`; `reason_category` is its main recall reason |
 | `product_reason_tags` | every `(category, detail)` matched in the recall reason, e.g. `pathogen / listeria`, `undeclared_allergen / peanut`; a product can have several |
 | `data_issues` | records that failed a sanity check, for manual review; nothing is auto-corrected |
@@ -59,6 +61,17 @@ Note: one event covers many products, so decide whether you're counting events o
 | XXL | 1 million + |
 
 `size` is NULL when no quantity was given ("Unknown"). The estimates are only good to an order of magnitude — use `size` for comparisons, not `est_units` for totals. Per-product values are in `products.est_units` / `quantity_unit_type` / `quantity_is_total`.
+
+### Distribution
+
+`fda_recall/distribution.py` reads `distribution_pattern` ("IL, MI, KY, IN, WI", "New Jersey, New York and Maryland", "Nationwide and Canada", "Domestic: AL, AR. Foreign: Not applicable.") into:
+
+- `event_states`: every state or territory named, by code or full name
+- `is_nationwide`: says nationwide / all 50 states / worldwide, or was sold online (these usually list no states)
+- `is_online`: sold online, by mail order, or on Amazon etc.; counted as nationwide since anyone could have bought it (Amazon Fresh / physical Amazon stores excluded)
+- `is_foreign`: mentions another country or foreign/international distribution, ignoring "no foreign distribution" style negations
+
+Codes that are also words (IN, OR, ME, OK…) only count in upper case in normal text, and only inside a list in all-caps text. About 400 events name no states and aren't nationwide ("Domestic distribution only", "Canada only", "Unknown"). To ask which recalls reached a state, use `event_state_reach` so nationwide recalls are included.
 
 ### Recall reason categories
 
@@ -96,6 +109,12 @@ GROUP BY yr ORDER BY yr;
 SELECT e.size, p.reason_category, count(DISTINCT e.event_id) FROM events e
 JOIN products p USING (event_id)
 GROUP BY 1, 2 ORDER BY 2, min(e.est_units);
+
+-- Recall events that reached Texas, by main reason (nationwide ones included)
+SELECT p.reason_category, count(DISTINCT r.event_id) FROM event_state_reach r
+JOIN products p USING (event_id)
+WHERE r.state = 'TX'
+GROUP BY 1 ORDER BY 2 DESC;
 
 -- Products by main recall reason
 SELECT reason_category, count(*) FROM products GROUP BY 1 ORDER BY 2 DESC;

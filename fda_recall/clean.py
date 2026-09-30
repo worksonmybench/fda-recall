@@ -10,7 +10,11 @@ in the raw import tables is modified.
 
 Tables produced:
     events       one row per recall event (firm, address, distribution, dates),
-                 with est_units and a t-shirt size (see quantity.py)
+                 with est_units and a t-shirt size (see quantity.py), and
+                 is_nationwide / is_foreign / is_online / state_count (see distribution.py)
+    event_states the US states and territories each event's distribution names
+    event_state_reach (view)
+                 event_states plus every state for nationwide events
     products     one row per recall_number, linked to events by event_id,
                  with reason_category (see reasons.py)
     product_reason_tags
@@ -19,11 +23,12 @@ Tables produced:
 """
 
 import argparse
+import json
 import re
 from datetime import date
 from itertools import groupby
 
-from . import db, quantity, reasons
+from . import db, distribution, quantity, reasons
 
 # Values the FDA uses to mean "no value".
 PLACEHOLDERS = {"", "N/A", "NA", "n/a", "N/a", "None", "none"}
@@ -63,6 +68,8 @@ MIN_PLAUSIBLE_YEAR = 1990
 CLASS_SEVERITY = {"Class I": 1, "Class II": 2, "Class III": 3}
 
 SCHEMA = f"""
+DROP VIEW IF EXISTS event_state_reach;
+DROP TABLE IF EXISTS event_states;
 DROP TABLE IF EXISTS product_reason_tags;
 DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS events;
@@ -76,8 +83,28 @@ CREATE TABLE events (
     most_severe_class       TEXT,
     ongoing_product_count   INTEGER NOT NULL,
     est_units               REAL,
-    size                    TEXT
+    size                    TEXT,
+    is_nationwide           INTEGER NOT NULL,
+    is_foreign              INTEGER NOT NULL,
+    is_online               INTEGER NOT NULL,
+    state_count             INTEGER NOT NULL
 );
+
+CREATE TABLE event_states (
+    event_id                TEXT NOT NULL REFERENCES events(event_id),
+    state                   TEXT NOT NULL,
+    PRIMARY KEY (event_id, state)
+);
+
+-- "Which recalls reached this state?": named states, plus all 50 states
+-- and DC for nationwide events (incl. online sales; these usually don't list states).
+CREATE VIEW event_state_reach AS
+    SELECT event_id, state, 0 AS via_nationwide FROM event_states
+    UNION
+    SELECT e.event_id, s.state, 1 FROM events e
+    CROSS JOIN (SELECT value AS state FROM json_each('{json.dumps(sorted(distribution.STATES))}')) s
+    WHERE e.is_nationwide
+      AND NOT EXISTS (SELECT 1 FROM event_states x WHERE x.event_id = e.event_id AND x.state = s.state);
 
 CREATE TABLE products (
     recall_number           TEXT PRIMARY KEY,
@@ -108,6 +135,7 @@ CREATE TABLE data_issues (
 CREATE INDEX ix_events_firm_key       ON events(firm_key);
 CREATE INDEX ix_events_report_date    ON events(report_date);
 CREATE INDEX ix_events_size           ON events(size);
+CREATE INDEX ix_event_states_state    ON event_states(state);
 CREATE INDEX ix_products_event        ON products(event_id);
 CREATE INDEX ix_products_class        ON products(classification);
 CREATE INDEX ix_products_status       ON products(status);
@@ -185,7 +213,7 @@ def rebuild(conn):
         rec["quantity"] = quantity.parse_quantity(rec["product_quantity"])
         records.append(rec)
 
-    events = []
+    events, event_states = [], []
     for event_id, group in groupby(records, key=lambda r: r["event_id"]):
         group = list(group)
         if event_id is None:
@@ -197,6 +225,8 @@ def rebuild(conn):
                 flag(first, f, "event_field_mismatch", " | ".join(sorted(v or "NULL" for v in values)))
         classes = [rec["classification"] for rec in group if rec["classification"] in CLASS_SEVERITY]
         units = quantity.event_units([(rec["product_quantity"], rec["quantity"]) for rec in group])
+        states, nationwide, foreign, online = distribution.parse_distribution(first["distribution_pattern"])
+        event_states.extend((event_id, state) for state in states)
         events.append((
             event_id,
             firm_key(first["recalling_firm"]),
@@ -206,6 +236,10 @@ def rebuild(conn):
             sum(rec["status"] == "Ongoing" for rec in group),
             units,
             quantity.size_bucket(units),
+            int(nationwide),
+            int(foreign),
+            int(online),
+            len(states),
         ))
 
     tag_cache = {}  # many products share the same reason text
@@ -225,7 +259,8 @@ def rebuild(conn):
 
     with conn:
         conn.executescript(SCHEMA)
-        conn.executemany(f"INSERT INTO events VALUES ({', '.join('?' * (len(EVENT_FIELDS) + 7))})", events)
+        conn.executemany(f"INSERT INTO events VALUES ({', '.join('?' * (len(EVENT_FIELDS) + 11))})", events)
+        conn.executemany("INSERT INTO event_states VALUES (?, ?)", event_states)
         conn.executemany(f"INSERT INTO products VALUES ({', '.join('?' * (len(PRODUCT_FIELDS) + 6))})", products)
         conn.executemany("INSERT INTO product_reason_tags VALUES (?, ?, ?)", reason_tags)
         conn.executemany(
@@ -237,7 +272,8 @@ def rebuild(conn):
         "products": len(products),
         "reason_tags": len(reason_tags),
         "untagged_products": sum(p[len(PRODUCT_FIELDS) + 2] == "other" for p in products),
-        "unsized_events": sum(e[-1] is None for e in events),
+        "unsized_events": sum(e[len(EVENT_FIELDS) + 6] is None for e in events),
+        "events_without_location": sum(not e[-1] and not e[-4] for e in events),
         "data_issues": len(issues),
     }
 
@@ -258,6 +294,7 @@ def print_summary(counts):
         f"Clean tables rebuilt: {counts['events']} events, {counts['products']} products"
         f" ({counts['untagged_products']} with no recall reason category),"
         f" {counts['unsized_events']} events with no usable quantity,"
+        f" {counts['events_without_location']} with no states or nationwide flag,"
         f" {counts['data_issues']} data issues"
     )
 

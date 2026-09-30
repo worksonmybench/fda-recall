@@ -70,7 +70,7 @@ class RebuildTests(unittest.TestCase):
         ])
         self.assertEqual(
             counts,
-            {"events": 2, "products": 3, "reason_tags": 3, "untagged_products": 0, "unsized_events": 0, "data_issues": 0},
+            {"events": 2, "products": 3, "reason_tags": 3, "untagged_products": 0, "unsized_events": 0, "events_without_location": 0, "data_issues": 0},
         )
         tags = set(conn.execute("SELECT p.reason_category, t.detail FROM products p JOIN product_reason_tags t USING (recall_number)"))
         self.assertEqual(tags, {("undeclared_allergen", "milk")})
@@ -83,8 +83,17 @@ class RebuildTests(unittest.TestCase):
         self.assertEqual(
             conn.execute("SELECT est_units, size FROM events WHERE event_id = '100'").fetchone(), (120.0, "S")
         )
+        self.assertEqual(list(conn.execute("SELECT state FROM event_states WHERE event_id = '100'")), [("IL",)])
         desc = conn.execute("SELECT product_description FROM products WHERE recall_number = 'F-0001-2020'").fetchone()
         self.assertEqual(desc, ("Widget crackers",))
+
+    def test_nationwide_events_reach_every_state(self):
+        conn, _ = self.rebuild([make_record(distribution_pattern="Nationwide and Canada")])
+        self.assertEqual(
+            conn.execute("SELECT is_nationwide, is_foreign, is_online, state_count FROM events").fetchone(), (1, 1, 0, 0)
+        )
+        reach = conn.execute("SELECT count(*), min(via_nationwide) FROM event_state_reach").fetchone()
+        self.assertEqual(reach, (51, 1))
 
     def test_issues_are_flagged(self):
         conn, _ = self.rebuild([
