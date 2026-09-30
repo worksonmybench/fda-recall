@@ -6,7 +6,7 @@ Usage:
 With no files given, loads every *.json / *.zip in the project folder.
 Safe to re-run: records are upserted by recall_number, unchanged records
 are left alone, and changed ones have their prior version kept in
-recall_history.
+recall_history. Afterwards the clean tables are rebuilt (see clean.py).
 """
 
 import argparse
@@ -17,7 +17,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import db
+from . import clean, db
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 
@@ -148,6 +148,7 @@ def main(argv=None):
                     f"  run {run_id}: {total} records -> {counts['inserted']} new,"
                     f" {counts['updated']} changed, {counts['unchanged']} unchanged"
                 )
+        clean.print_summary(clean.rebuild(conn))
     finally:
         conn.close()
     print(f"Database: {args.db}")
