@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fda-recall-web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "fda_recall.web.serve", "--port", "8765"],
+      "port": 8765
+    }
+  ]
+}

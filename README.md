@@ -18,6 +18,30 @@ It's safe to re-run. Records are matched by `recall_number`:
 - **changed** records (e.g. status `Ongoing` → `Terminated`) are updated, and the previous version goes into `recall_history`
 - **unchanged** records are left alone apart from `last_seen_run`
 
+## Web UI
+
+```bash
+python -m fda_recall.web.serve
+```
+
+opens a dev server at http://127.0.0.1:8000 that runs every query live against `data/recalls.db`, so query or page changes show up on refresh.
+
+To deploy:
+
+```bash
+python -m fda_recall.web.export
+```
+
+writes `dist/`: the `site/` files plus every API response pre-built as a static JSON file at the same URL the dev server uses (`api/states.json`, `api/dashboard/impacting/TX.json`, ...). Upload `dist/` to any static host or CDN (GitHub Pages, Cloudflare Pages, S3 + CloudFront); there's no database or server in production. Re-run the export after each data load.
+
+How it fits together:
+
+- `fda_recall/web/endpoints.py` defines each API response as a Python function registered at a path. A path parameter like `{scope}` must come with a function listing its allowed values, which is what lets the export enumerate every file. The dev server refuses values the export wouldn't produce, so dev can't drift from the deployed site.
+- `site/` is plain HTML/CSS/JS modules, with no build step or chart library. It fetches `api/<path>.json` with relative URLs, so it works from any base path.
+- To add a stat: add or extend an endpoint, then render it in `site/app.js`.
+
+The main page leads with a tile map of ongoing recalls per state. Its toggle switches between **recalls impacting a state** (the distribution reached it; nationwide recalls count everywhere) and **recalls originating from a state** (the recalling firm is located there). Selecting a state scopes the whole dashboard to it, and the view and state are kept in the URL (`#originating/CA`), so links can be shared.
+
 ## Tables
 
 The database has two layers.

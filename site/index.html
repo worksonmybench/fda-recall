@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FDA Food Recalls</title>
+  <meta name="description" content="Explore FDA food recall enforcement reports: what gets recalled, why, how big, and where.">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <header class="page-header">
+      <h1>FDA food recalls</h1>
+      <p class="subtitle">Recall events from FDA enforcement reports. <span id="data-updated"></span></p>
+    </header>
+
+    <form class="filters" id="filters" onsubmit="return false">
+      <fieldset class="segmented" id="view-toggle">
+        <legend class="visually-hidden">Which recalls to count for a state</legend>
+        <label><input type="radio" name="view" value="impacting" checked><span>Recalls impacting a state</span></label>
+        <label><input type="radio" name="view" value="originating"><span>Recalls originating from a state</span></label>
+      </fieldset>
+      <label for="scope" class="visually-hidden">State</label>
+      <select id="scope" name="scope"></select>
+    </form>
+
+    <main id="content">
+      <section class="card map-card">
+        <h2 id="map-title">Ongoing recall events by state</h2>
+        <p class="card-note" id="map-note"></p>
+        <div class="legend" id="map-legend"></div>
+        <div class="chart map" id="map"></div>
+        <details><summary>Show table</summary><div id="map-table"></div></details>
+      </section>
+
+      <h2 class="scope-heading" id="scope-heading" aria-live="polite"></h2>
+      <section class="tiles" id="tiles"></section>
+
+      <section class="card">
+        <h2>Recall events per year</h2>
+        <p class="card-note" id="year-note"></p>
+        <div class="legend" id="year-legend"></div>
+        <div class="chart" id="year-chart"></div>
+        <details><summary>Show table</summary><div id="year-table"></div></details>
+      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <h2>Why products were recalled</h2>
+          <p class="card-note">Recall events involving each reason. An event can involve several.</p>
+          <div class="chart" id="reason-chart"></div>
+          <details><summary>Show table</summary><div id="reason-table"></div></details>
+        </section>
+
+        <section class="card">
+          <h2>What was recalled</h2>
+          <p class="card-note">Recall events involving each kind of food.</p>
+          <div class="chart" id="product-chart"></div>
+          <details><summary>Show table</summary><div id="product-table"></div></details>
+        </section>
+      </div>
+
+      <section class="card">
+        <h2>Recall size</h2>
+        <p class="card-note">Estimated retail units recalled, by order of magnitude: XS under 100, S under 1,000, M under 10,000, L under 100,000, XL under 1 million, XXL 1 million or more.</p>
+        <div class="chart" id="size-chart"></div>
+        <details><summary>Show table</summary><div id="size-table"></div></details>
+      </section>
+
+      <section class="card">
+        <h2>Most recent recall events</h2>
+        <div class="table-scroll" id="recent-table"></div>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      Source: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a>.
+      Categories, sizes and locations are derived from FDA's free-text fields and are approximate.
+    </footer>
+    <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+  </div>
+</body>
+</html>
