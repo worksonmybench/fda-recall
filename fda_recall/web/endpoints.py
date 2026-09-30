@@ -244,3 +244,42 @@ def lookup(conn):
             "SELECT DISTINCT u.upc, p.event_id FROM product_upcs u JOIN products p USING (recall_number) ORDER BY 1, 2"):
         upcs.setdefault(upc, []).append(event_id)
     return {"recalls": recalls, "upcs": upcs}
+
+
+# --- search -------------------------------------------------------------------
+
+SNIPPET_CHARS = 80
+SEARCH_COLUMNS = [
+    "id", "reported", "started", "firm", "class", "open", "size", "units", "nationwide",
+    "origin", "illness", "products", "reasons", "categories", "states", "snippet",
+]
+
+
+@endpoint("search_index")
+def search_index(conn):
+    """Every event's filterable fields, for the client-side search page.
+
+    Sent as column names + row arrays (not one object per event) to keep the
+    download small. reasons / categories are arrays of codes; states is the
+    2-letter codes run together ("ALAZCA") since it's the longest field.
+    """
+    rows = conn.execute(f"""
+        SELECT e.event_id, e.report_date, e.recall_initiation_date, e.recalling_firm,
+               replace(e.most_severe_class, 'Class ', ''),
+               e.ongoing_product_count > 0, e.size, CAST(round(e.est_units) AS INTEGER),
+               e.is_nationwide, e.state, e.illness_reported, e.product_count,
+               (SELECT group_concat(DISTINCT p.reason_category) FROM products p WHERE p.event_id = e.event_id),
+               (SELECT group_concat(DISTINCT p.product_category) FROM products p WHERE p.event_id = e.event_id),
+               (SELECT group_concat(s.state) FROM event_states s WHERE s.event_id = e.event_id),
+               (SELECT substr(replace(p.product_description, char(10), ' '), 1, {SNIPPET_CHARS})
+                FROM products p WHERE p.event_id = e.event_id ORDER BY p.recall_number LIMIT 1)
+        FROM events e
+        ORDER BY e.report_date DESC, e.event_id DESC""").fetchall()
+    split = lambda v: sorted(v.split(",")) if v else []
+    out = []
+    for r in rows:
+        r = list(r)
+        r[12], r[13], r[14] = split(r[12]), split(r[13]), "".join(split(r[14]))
+        r[5], r[8], r[10] = int(r[5]), int(r[8]), int(r[10])
+        out.append(r)
+    return {"columns": SEARCH_COLUMNS, "rows": out}

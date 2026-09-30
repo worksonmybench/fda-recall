@@ -119,6 +119,12 @@ function renderDashboard(d) {
   renderHBars($("size-chart"), sizeRows, { label: (r) => r.key, value: (r) => r.events });
   renderTable($("size-table"), [{ label: "Size", value: (r) => r.key }, { label: "Events", value: (r) => r.events, numeric: true }], sizeRows);
 
+  // Hand the current view + state over to the search page.
+  const params = new URLSearchParams();
+  if (d.scope !== "US") params.set("state", d.scope);
+  if (d.scope !== "US" && d.view !== "impacting") params.set("view", d.view);
+  $("search-link").href = `search.html${params.size ? `?${params}` : ""}`;
+
   renderTable($("recent-table"), [
     { label: "Reported", value: (r) => r.report_date },
     { label: "Firm", value: (r) => r.recalling_firm, href: (r) => eventUrl(r.event_id) },

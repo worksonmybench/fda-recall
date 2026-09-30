@@ -64,6 +64,17 @@ class EndpointTests(unittest.TestCase):
         self.assertEqual(data["recalls"], {"F-0001-2020": "100", "F-0002-2020": "200"})
         self.assertEqual(data["upcs"], {})
 
+    def test_search_index(self):
+        data = endpoints.search_index(self.conn)
+        rows = [dict(zip(data["columns"], r)) for r in data["rows"]]
+        self.assertEqual([r["id"] for r in rows], ["200", "100"] if rows[0]["id"] == "200" else ["100", "200"])
+        by_id = {r["id"]: r for r in rows}
+        self.assertEqual(by_id["100"]["states"], "IL")  # codes run together
+        self.assertEqual(by_id["100"]["reasons"], ["undeclared_allergen"])
+        self.assertEqual(by_id["100"]["class"], "II")
+        self.assertEqual((by_id["200"]["nationwide"], by_id["200"]["open"], by_id["200"]["origin"]), (1, 1, "CA"))
+        self.assertLessEqual(len(by_id["100"]["snippet"]), endpoints.SNIPPET_CHARS)
+
     def test_export_writes_every_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "recalls.db"
