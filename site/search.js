@@ -47,6 +47,7 @@ function readFilters() {
     date: f.date.value,
     from: f.from.value,
     to: f.to.value,
+    agency: f.agency.value,
     reason: f.reason.value,
     category: f.category.value,
     state: f.state.value,
@@ -75,7 +76,7 @@ function writeURL(filters) {
 function applyURL() {
   const p = new URLSearchParams(location.search);
   const f = form();
-  for (const name of ["q", "from", "to", "reason", "category", "state", "status"]) f[name].value = p.get(name) ?? "";
+  for (const name of ["q", "from", "to", "agency", "reason", "category", "state", "status"]) f[name].value = p.get(name) ?? "";
   f.date.value = p.get("date") ?? "reported";
   f.view.value = p.get("view") ?? "impacting";
   $("sort").value = p.get("sort") ?? "newest";
@@ -93,6 +94,7 @@ function matches(e, f, terms) {
   const date = f.date === "started" ? e.started : e.reported;
   if (f.from && (!date || date < f.from)) return false;
   if (f.to && (!date || date > f.to)) return false;
+  if (f.agency && e.agency !== f.agency.toUpperCase()) return false;
   if (f.reason && !e.reasons.includes(f.reason)) return false;
   if (f.category && !e.categories.includes(f.category)) return false;
   if (f.status === "open" && !e.open) return false;
@@ -146,7 +148,7 @@ function renderResults(results) {
 
   const table = node("table", { class: "results" });
   const head = node("tr");
-  for (const [h, cls] of [["Reported", ""], ["Firm and product", ""], ["Reason", ""], ["Class", ""], ["Size", ""], ["Reach", ""], ["Products", "num"]]) {
+  for (const [h, cls] of [["Reported", ""], ["Agency", ""], ["Firm and product", ""], ["Reason", ""], ["Class", ""], ["Size", ""], ["Reach", ""], ["Products", "num"]]) {
     head.append(node("th", cls ? { class: cls } : {}, h));
   }
   table.append(node("thead"), node("tbody"));
@@ -158,9 +160,10 @@ function renderResults(results) {
     if (e.snippet) firm.append(node("div", { class: "snippet" }, e.snippet));
     tr.append(
       node("td", { class: "nowrap" }, (f.date === "started" ? e.started : e.reported) ?? ""),
+      node("td", {}, e.agency),
       firm,
       node("td", {}, e.reasons.filter((r) => r !== "other").map(label).join(", ") || label("other")),
-      node("td", { class: "nowrap" }, e.class ? `Class ${e.class}` : "Not yet"),
+      node("td", { class: "nowrap" }, e.class ? `Class ${e.class}` : e.type === "public_health_alert" ? "Public health alert" : "Not yet"),
       node("td", {}, e.size === "unknown" ? "Unknown" : e.size),
       node("td", { class: "nowrap" }, reach(e)),
       node("td", { class: "num" }, formatNumber(e.products)),

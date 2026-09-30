@@ -291,3 +291,68 @@ table.results .snippet { color: var(--text-secondary); font-size: 12px; margin-t
   .facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .facts dd { margin-bottom: 8px; }
 }
+
+/* --- site nav (every page) ------------------------------------------------------ */
+.viz-root { --series-2: #eb6834; }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .viz-root { --series-2: #d95926; } }
+:root[data-theme="dark"] .viz-root { --series-2: #d95926; }
+
+.site-nav {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+  padding-bottom: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--grid);
+}
+.site-nav .brand { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 16px; }
+.site-nav .nav-links { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 15px; }
+.site-nav .nav-links a { color: var(--text-secondary); text-decoration: none; padding: 2px 0; border-bottom: 2px solid transparent; }
+.site-nav .nav-links a:hover { color: var(--text-primary); }
+.site-nav .nav-links a[aria-current="page"] { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--seq-5-strong); }
+.nav-search { display: flex; gap: 6px; margin-left: auto; }
+.nav-search input {
+  font: inherit; font-size: 14px; color: var(--text-primary); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; width: 210px; max-width: 100%; min-width: 0;
+}
+.nav-search button {
+  font: inherit; font-size: 14px; color: #ffffff; background: var(--seq-5-strong);
+  border: 0; border-radius: 8px; padding: 5px 12px; cursor: pointer;
+}
+@media (max-width: 560px) { .nav-search { margin-left: 0; width: 100%; } .nav-search input { flex: 1; width: auto; } }
+#nav-search-results:empty { display: none; }
+#nav-search-results { margin: -8px 0 16px; }
+
+/* --- home ----------------------------------------------------------------------------- */
+.hero { margin-bottom: 20px; }
+.hero h1 { font-size: 32px; line-height: 1.2; margin-bottom: 10px; }
+.lede { font-size: 18px; line-height: 1.5; max-width: 760px; margin: 0 0 16px; color: var(--text-primary); }
+.notice { border-left: 3px solid var(--baseline); padding-left: 10px; }
+.recall-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+.recall-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.recall-card h3 { font-size: 15px; margin: 4px 0 0; overflow-wrap: anywhere; }
+.recall-card .chip { align-self: flex-start; }
+.recall-card p { margin: 0; }
+.recall-card .reason { font-size: 14px; overflow-wrap: anywhere; }
+.hbars .name a { color: inherit; }
+.hbars a.bar { display: block; }
+
+/* line chart */
+.chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .dot { stroke-width: 2; }
+.chart .reference { stroke: var(--baseline); stroke-width: 1; }
+.chart .reference-label, .chart .end-label { fill: var(--text-secondary); font-size: 11px; }
+.chart .end-label { fill: var(--text-primary); font-size: 12px; }
+.chart .crosshair { stroke: var(--text-muted); stroke-width: 1; pointer-events: none; }
+.legend .linekey { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+
+/* --- about --------------------------------------------------------------------------------- */
+.prose { max-width: 820px; }
+.prose p, .prose li { font-size: 15px; line-height: 1.6; }
+.prose ul { padding-left: 20px; }
+
+/* --- agencies ----------------------------------------------------------------------- */
+/* Line colors are fixed per series (never cycled): FDA = series-1 blue,
+   news coverage = series-2 orange, USDA = series-3 aqua. "No class" (USDA public
+   health alerts, not-yet-classified FDA recalls) is a neutral gray in class charts. */
+.viz-root { --series-3: #1baf7a; --unclassified: #b4b2a9; }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .viz-root { --series-3: #199e70; --unclassified: #6b6a65; } }
+:root[data-theme="dark"] .viz-root { --series-3: #199e70; --unclassified: #6b6a65; }
+.agency-tag { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid var(--border); color: var(--text-secondary); white-space: nowrap; }

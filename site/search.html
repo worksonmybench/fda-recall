@@ -3,14 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Search Recalls · FDA Food Recalls</title>
-  <meta name="description" content="Search and filter FDA food recall events by date, reason, food, class, size and state.">
+  <title>Search Recalls · US Food Recalls</title>
+  <meta name="description" content="Search and filter FDA and USDA food recall events by date, reason, food, class, size and state.">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="search.js"></script>
+  <script type="module" src="nav.js"></script>
 </head>
 <body>
   <div class="viz-root">
-    <nav class="breadcrumb"><a href="./">← All recalls</a></nav>
+    <nav class="site-nav" aria-label="Site">
+      <a class="brand" href="./">US food recalls</a>
+      <div class="nav-links">
+        <a href="./">Overview</a>
+        <a href="state.html">By state</a>
+        <a href="search.html">Search</a>
+        <a href="about.html">About</a>
+      </div>
+      <form class="nav-search" id="nav-search" role="search">
+        <label for="nav-search-input" class="visually-hidden">Find a recall by number, UPC or event ID</label>
+        <input id="nav-search-input" type="search" placeholder="Recall #, UPC or event ID" autocomplete="off">
+        <button type="submit">Find</button>
+      </form>
+    </nav>
+    <div class="search-results" id="nav-search-results" aria-live="polite"></div>
     <header class="page-header">
       <h1>Search recalls</h1>
       <p class="subtitle" id="data-updated">Loading recall index…</p>
@@ -41,6 +56,14 @@
         </div>
       </fieldset>
 
+      <div class="field">
+        <label for="agency">Agency</label>
+        <select id="agency" name="agency">
+          <option value="">FDA and USDA</option>
+          <option value="fda">FDA: most foods</option>
+          <option value="usda">USDA: meat, poultry and egg products</option>
+        </select>
+      </div>
       <div class="field">
         <label for="reason">Why it was recalled</label>
         <select id="reason" name="reason"><option value="">Any reason</option></select>
@@ -74,7 +97,7 @@
           <label><input type="checkbox" name="class" value="I"> Class I</label>
           <label><input type="checkbox" name="class" value="II"> Class II</label>
           <label><input type="checkbox" name="class" value="III"> Class III</label>
-          <label><input type="checkbox" name="class" value="none"> Not yet classified</label>
+          <label><input type="checkbox" name="class" value="none"> No class (incl. USDA alerts)</label>
         </div>
       </fieldset>
       <fieldset class="field">
@@ -111,8 +134,8 @@
     </main>
 
     <footer class="page-footer">
-      Source: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a>.
-      Categories, sizes and locations are derived from FDA's free-text fields and are approximate.
+      Sources: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a> and the <a href="https://www.fsis.usda.gov/science-data/developer-resources/recall-api">USDA FSIS Recall API</a>.
+      Categories, sizes and locations are derived from the agencies' free-text records and are approximate.
     </footer>
   </div>
 </body>

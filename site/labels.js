@@ -17,6 +17,15 @@ export const LABELS = {
   regulator_inspection: "Regulator inspection", firm_testing: "Firm's own testing", customer_testing: "Customer's testing",
   consumer_complaint: "Consumer complaint", illness_investigation: "Illness investigation",
   label_or_record_review: "Label or record review",
+  // agencies and recall types
+  fda: "FDA", usda: "USDA", all: "FDA + USDA",
+  recall: "Recall", public_health_alert: "Public health alert",
+};
+
+export const AGENCY_NAMES = {
+  all: "All food recalls (FDA + USDA)",
+  fda: "FDA: most foods",
+  usda: "USDA: meat, poultry and egg products",
 };
 export const label = (key) => LABELS[key] ?? key;
 

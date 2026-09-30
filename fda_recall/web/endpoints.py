@@ -12,7 +12,10 @@ So every parameter must have a finite list of values (the `params`
 functions below), which is also what keeps the deployed site static.
 """
 
+import html
+import json
 import re
+from datetime import date
 
 from .. import distribution
 
@@ -74,6 +77,18 @@ def views(conn):
     return VIEWS
 
 
+# Which agency's recalls: "all", or one of FDA / USDA (FSIS).
+AGENCIES = ["all", "fda", "usda"]
+
+
+def agencies(conn):
+    return AGENCIES
+
+
+def _agency_filter(agency):
+    return ("1=1", ()) if agency == "all" else ("e.agency = ?", (agency.upper(),))
+
+
 def scopes(conn):
     """'US' (everything) plus every state/territory code with recalls in either view."""
     codes = {r[0] for r in conn.execute("SELECT DISTINCT state FROM event_state_reach")}
@@ -101,6 +116,7 @@ def meta(conn):
         "data_last_updated": last[0] if last else None,
         "loaded_at": last[1] if last else None,
         "views": VIEWS,
+        "agencies": AGENCIES,
         "scopes": [
             {"code": code, "name": "All US" if code == ALL_US else STATE_NAMES.get(code, code)}
             for code in scopes(conn)
@@ -108,9 +124,10 @@ def meta(conn):
     }
 
 
-@endpoint("states")
-def states(conn):
-    """Per-state counts for the map, in both views."""
+@endpoint("states/{agency}", agency=agencies)
+def states(conn, agency):
+    """Per-state counts for the map, in both views, for one agency or all."""
+    where, args = _agency_filter(agency)
     metrics = """
         count(*) AS events,
         sum(e.ongoing_product_count > 0) AS ongoing,
@@ -119,9 +136,9 @@ def states(conn):
     result = {code: {"name": name} for code, name in STATE_NAMES.items()}
     for row in _rows(conn, f"""
             SELECT r.state AS code, {metrics}, sum(r.via_nationwide) AS via_nationwide
-            FROM event_state_reach r JOIN events e USING (event_id) GROUP BY 1"""):
+            FROM event_state_reach r JOIN events e USING (event_id) WHERE {where} GROUP BY 1""", args):
         result[row.pop("code")]["impacting"] = row
-    for row in _rows(conn, f"SELECT e.state AS code, {metrics} FROM events e GROUP BY 1"):
+    for row in _rows(conn, f"SELECT e.state AS code, {metrics} FROM events e WHERE {where} GROUP BY 1", args):
         code = row.pop("code")
         if code in result:
             result[code]["originating"] = row
@@ -132,9 +149,11 @@ def states(conn):
     return {"states": result}
 
 
-@endpoint("dashboard/{view}/{scope}", view=views, scope=scopes)
-def dashboard(conn, view, scope):
-    where, args = _scope_filter(view, scope)
+@endpoint("dashboard/{agency}/{view}/{scope}", agency=agencies, view=views, scope=scopes)
+def dashboard(conn, agency, view, scope):
+    scope_where, scope_args = _scope_filter(view, scope)
+    agency_where, agency_args = _agency_filter(agency)
+    where, args = f"{scope_where} AND {agency_where}", (*scope_args, *agency_args)
 
     totals = _rows(conn, f"""
         SELECT count(*) AS events,
@@ -148,7 +167,8 @@ def dashboard(conn, view, scope):
         SELECT substr(report_date, 1, 4) AS year,
                sum(most_severe_class = 'Class I') AS class_1,
                sum(most_severe_class = 'Class II') AS class_2,
-               sum(most_severe_class = 'Class III') AS class_3
+               sum(most_severe_class = 'Class III') AS class_3,
+               sum(most_severe_class IS NULL) AS unclassified
         FROM events e WHERE {where} AND report_date IS NOT NULL
         GROUP BY 1 ORDER BY 1""", args)
 
@@ -171,7 +191,7 @@ def dashboard(conn, view, scope):
 
     recent = _rows(conn, f"""
         SELECT e.event_id, e.report_date, e.recalling_firm, e.most_severe_class, e.size,
-               e.is_nationwide, e.state_count,
+               e.is_nationwide, e.state_count, e.agency, e.recall_type,
                (SELECT reason_for_recall FROM products p WHERE p.event_id = e.event_id LIMIT 1) AS reason,
                (SELECT reason_category FROM products p WHERE p.event_id = e.event_id
                 ORDER BY reason_category = 'other' LIMIT 1) AS reason_category
@@ -179,6 +199,7 @@ def dashboard(conn, view, scope):
         ORDER BY e.report_date DESC, e.event_id DESC LIMIT 15""", args)
 
     return {
+        "agency": agency,
         "view": view,
         "scope": scope,
         "totals": totals,
@@ -232,7 +253,15 @@ def event(conn, event_id):
         FROM events e WHERE e.firm_key = ? AND e.event_id <> ?
         ORDER BY e.report_date DESC LIMIT 25""", (e["firm_key"], event_id))
 
-    return {"event": e, "products": products, "firm_history": firm_history}
+    # USDA notices: the full notice text (FDA records have no equivalent).
+    notice = notice_title = None
+    if e["agency"] == "USDA" and _has_table(conn, "usda_recalls"):
+        row = conn.execute("SELECT raw_json FROM usda_recalls WHERE recall_number = ?", (products[0]["recall_number"],)).fetchone()
+        if row:
+            rec = json.loads(row[0])
+            notice, notice_title = rec.get("summary"), html.unescape(rec.get("title") or "") or None
+
+    return {"event": e, "products": products, "firm_history": firm_history, "notice": notice, "notice_title": notice_title}
 
 
 @endpoint("lookup")
@@ -251,7 +280,7 @@ def lookup(conn):
 SNIPPET_CHARS = 80
 SEARCH_COLUMNS = [
     "id", "reported", "started", "firm", "class", "open", "size", "units", "nationwide",
-    "origin", "illness", "products", "reasons", "categories", "states", "snippet",
+    "origin", "illness", "products", "reasons", "categories", "states", "snippet", "agency", "type",
 ]
 
 
@@ -272,7 +301,8 @@ def search_index(conn):
                (SELECT group_concat(DISTINCT p.product_category) FROM products p WHERE p.event_id = e.event_id),
                (SELECT group_concat(s.state) FROM event_states s WHERE s.event_id = e.event_id),
                (SELECT substr(replace(p.product_description, char(10), ' '), 1, {SNIPPET_CHARS})
-                FROM products p WHERE p.event_id = e.event_id ORDER BY p.recall_number LIMIT 1)
+                FROM products p WHERE p.event_id = e.event_id ORDER BY p.recall_number LIMIT 1),
+               e.agency, e.recall_type
         FROM events e
         ORDER BY e.report_date DESC, e.event_id DESC""").fetchall()
     split = lambda v: sorted(v.split(",")) if v else []
@@ -283,3 +313,93 @@ def search_index(conn):
         r[5], r[8], r[10] = int(r[5]), int(r[8]), int(r[10])
         out.append(r)
     return {"columns": SEARCH_COLUMNS, "rows": out}
+
+
+# --- trends (the home page story) -----------------------------------------------
+
+TREND_BASE_YEAR = 2014  # first full year with both agencies (FDA data starts 2012-06, USDA 2014-01)
+
+
+def _has_table(conn, name):
+    return conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)).fetchone() is not None
+
+
+def _months_covered(year, first, last):
+    """How many months of `year` fall between first and last (ISO dates)."""
+    start = max(date.fromisoformat(first), date(year, 1, 1))
+    end = min(date.fromisoformat(last), date(year, 12, 31))
+    if end < start:
+        return 0.0
+    return ((end - start).days + 1) / ((date(year, 12, 31) - date(year, 1, 1)).days + 1) * 12
+
+
+@endpoint("trends")
+def trends(conn):
+    """Per-year recall counts for each agency, plus media attention when fetched.
+
+    Counts are compared as events *per month* within each year, so partial
+    years line up with full ones, and every line is indexed to
+    TREND_BASE_YEAR = 100 so they can share one axis.
+    """
+    last_overall = conn.execute("SELECT max(report_date) FROM events").fetchone()[0]
+    spans = {a: conn.execute("SELECT min(report_date), max(report_date) FROM events WHERE agency = ?", (a,)).fetchone()
+             for a in ("FDA", "USDA")}
+    counts = {}
+    for year, agency, n, class_1, large, illness in conn.execute("""
+            SELECT CAST(substr(report_date, 1, 4) AS INTEGER), agency, count(*),
+                   sum(most_severe_class = 'Class I'), sum(size IN ('XL', 'XXL')), sum(illness_reported)
+            FROM events WHERE report_date IS NOT NULL GROUP BY 1, 2"""):
+        counts[(year, agency)] = {"events": n, "class_1": class_1, "large": large, "illness": illness}
+
+    media = {}
+    if _has_table(conn, "media_attention"):
+        for year, matching, total in conn.execute("""
+                SELECT CAST(substr(m.month, 1, 4) AS INTEGER), sum(m.hits), sum(a.hits)
+                FROM media_attention m JOIN media_attention a
+                  ON a.source = m.source AND a.month = m.month AND a.query_id = 'all'
+                WHERE m.query_id = 'food_recall' AND a.hits > 0
+                GROUP BY 1"""):
+            media[year] = {"share": matching / total, "articles": matching}
+
+    all_years = sorted({y for y, _ in counts} | set(media))
+    years = []
+    for year in all_years:
+        row = {"year": year}
+        for agency in ("FDA", "USDA"):
+            key = agency.lower()
+            c = counts.get((year, agency))
+            first, last = spans[agency]
+            covered = _months_covered(year, first, last) if first else 0
+            row[f"{key}_events"] = c["events"] if c else None
+            row[f"{key}_per_month"] = round(c["events"] / covered, 2) if c and covered else None
+            row[f"{key}_class_1_share"] = round(c["class_1"] / c["events"], 4) if c else None
+            row[f"{key}_large_events"] = c["large"] if c else None
+            row[f"{key}_illness_events"] = c["illness"] if c else None
+        row["events"] = sum(row[f"{a}_events"] or 0 for a in ("fda", "usda"))
+        row["partial"] = any(
+            row[f"{a.lower()}_events"] and _months_covered(year, *spans[a]) < 11.5 for a in ("FDA", "USDA")
+        )
+        m = media.get(year)
+        row["media_share"] = round(m["share"], 6) if m else None
+        row["media_articles"] = m["articles"] if m else None
+        years.append(row)
+
+    base = next((y for y in years if y["year"] == TREND_BASE_YEAR), None)
+
+    def index(value, base_value):
+        return round(100 * value / base_value, 1) if value is not None and base_value else None
+
+    for y in years:
+        y["fda_index"] = index(y["fda_per_month"], base and base["fda_per_month"])
+        y["usda_index"] = index(y["usda_per_month"], base and base["usda_per_month"])
+        y["media_index"] = index(y["media_share"], base and base["media_share"])
+
+    ongoing = dict(conn.execute("SELECT agency, count(*) FROM events WHERE ongoing_product_count > 0 GROUP BY 1"))
+    return {
+        "base_year": TREND_BASE_YEAR,
+        "first_report": {a.lower(): spans[a][0] for a in spans},
+        "last_report": last_overall,
+        "ongoing_now": {"fda": ongoing.get("FDA", 0), "usda": ongoing.get("USDA", 0)},
+        "media_source": "The New York Times" if media else None,
+        "years": years,
+    }

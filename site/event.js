@@ -30,10 +30,16 @@ function reachText(e) {
 
 function renderBadges(e, products) {
   const open = e.ongoing_product_count;
+  const isAlert = e.recall_type === "public_health_alert";
   const badges = [
-    ["Class", e.most_severe_class ?? "Not yet classified"],
-    ["Status", open ? `Ongoing: ${formatNumber(open)} of ${plural(products.length, "product")} open` : "Closed"],
-    ["Size", e.size ? `${e.size} · about ${formatNumber(Math.round(e.est_units))} retail units` : "Unknown"],
+    ["Agency", e.agency === "USDA" ? "USDA (FSIS)" : "FDA"],
+    [isAlert ? "Type" : "Class", isAlert ? "Public health alert" : e.most_severe_class ?? "Not yet classified"],
+    ["Status", !open ? "Closed" : e.agency === "USDA" ? "Ongoing"
+      : `Ongoing: ${formatNumber(open)} of ${plural(products.length, "product")} open`],
+    // USDA notices give pounds; show FSIS's own wording rather than our unit estimate.
+    ["Size", !e.size ? "Unknown" : e.agency === "USDA" && products[0]?.product_quantity
+      ? `${e.size} · ${products[0].product_quantity}`
+      : `${e.size} · about ${formatNumber(Math.round(e.est_units))} retail units`],
     ["Reach", reachText(e) + (e.is_foreign ? " + outside the US" : "")],
   ];
   if (e.illness_reported) badges.push(["Illnesses", "Reported"]);
@@ -51,16 +57,27 @@ function renderFacts(e, products) {
   };
   const allClosed = products.every((p) => p.termination_date);
   const sources = unique(products.flatMap((p) => p.detection_sources));
-  const facts = [
+  const location = [e.city, e.state, e.country !== "United States" ? e.country : null].filter(Boolean).join(", ");
+  const found = sources.length ? sources.map(label).join("; ") : "Not stated";
+  // FSIS notices have no classification date, initiation type or notification method,
+  // and record only the year a recall closed, so USDA recalls get a shorter list.
+  const facts = e.agency === "USDA" ? [
     ["Firm", e.recalling_firm],
-    ["Location", [e.city, e.state, e.country !== "United States" ? e.country : null].filter(Boolean).join(", ")],
+    ["Location", location || "Not stated"],
+    ["Announced by FSIS", e.report_date],
+    ["Closed", e.ongoing_product_count ? "Not yet" : "Yes"],
+    ["How the problem was found", found],
+    ["FSIS number", products[0]?.recall_number],
+  ] : [
+    ["Firm", e.recalling_firm],
+    ["Location", location],
     ["Recall started", e.recall_initiation_date],
     ["Classified by FDA", dates("center_classification_date", (v) => v[0])],
     ["Reported by FDA", e.report_date],
     ["Closed", allClosed ? dates("termination_date", (v) => v.at(-1)) : "Not yet"],
     ["Initiated", e.voluntary_mandated],
     ["Firm notified customers by", e.initial_firm_notification],
-    ["How the problem was found", sources.length ? sources.map(label).join("; ") : "Not stated"],
+    ["How the problem was found", found],
     ["FDA event ID", e.event_id],
   ];
   $("facts").replaceChildren(...facts.flatMap(([k, v]) => [node("dt", {}, k), node("dd", {}, v ?? "Not stated")]));
@@ -125,10 +142,13 @@ async function init() {
   const { event: e, products } = data;
   const names = Object.fromEntries(meta.scopes.map((s) => [s.code, s.name]));
 
-  document.title = `${e.recalling_firm} recall · FDA Food Recalls`;
-  $("firm").textContent = e.recalling_firm;
+  // Unnamed-firm public health alerts: FSIS's own title makes a better heading.
+  const heading = e.recalling_firm.startsWith("Firm not named") && data.notice_title ? data.notice_title : e.recalling_firm;
+  document.title = `${heading} · US Food Recalls`;
+  $("firm").textContent = heading;
   $("event-subtitle").textContent =
-    `Recall event ${e.event_id} · reported ${e.report_date} · ${plural(products.length, "product")}`;
+    `${e.agency} ${e.recall_type === "public_health_alert" ? "public health alert" : "recall"} · reported ${e.report_date}` +
+    (e.agency === "FDA" ? ` · ${plural(products.length, "product")}` : "");
   renderBadges(e, products);
   renderFacts(e, products);
 
@@ -143,6 +163,17 @@ async function init() {
 
   renderReasons(products);
   renderProducts(products);
+
+  // USDA: FSIS's own notice text, and a link to its page.
+  if (data.notice) {
+    $("notice-card").hidden = false;
+    $("notice-text").textContent = data.notice;
+    if (e.source_url) {
+      const link = $("notice-link");
+      link.href = e.source_url.replace(/^http:/, "https:");
+      link.hidden = false;
+    }
+  }
 
   if (data.firm_history.length) {
     $("history-card").hidden = false;

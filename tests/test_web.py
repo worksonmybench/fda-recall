@@ -26,23 +26,27 @@ class EndpointTests(unittest.TestCase):
 
     def test_every_exported_path_resolves_and_nothing_else_does(self):
         paths = list(endpoints.all_paths(self.conn))
-        self.assertIn("dashboard/impacting/IL", [p for p, _, _ in paths])
+        self.assertIn("dashboard/all/impacting/IL", [p for p, _, _ in paths])
+        self.assertIn("states/usda", [p for p, _, _ in paths])
         for url_path, _, kwargs in paths:
             fn, resolved = endpoints.resolve(self.conn, url_path)
             self.assertEqual(resolved, kwargs)
-        self.assertIsNone(endpoints.resolve(self.conn, "dashboard/impacting/ZZ"))
-        self.assertIsNone(endpoints.resolve(self.conn, "dashboard/bogus/IL"))
+        self.assertIsNone(endpoints.resolve(self.conn, "dashboard/all/impacting/ZZ"))
+        self.assertIsNone(endpoints.resolve(self.conn, "dashboard/all/bogus/IL"))
+        self.assertIsNone(endpoints.resolve(self.conn, "dashboard/cdc/impacting/IL"))
         self.assertIsNone(endpoints.resolve(self.conn, "nope"))
 
     def test_views(self):
         # Nationwide event 200 impacts IL too; only event 100 originates from IL.
-        impacting = endpoints.dashboard(self.conn, "impacting", "IL")["totals"]
-        originating = endpoints.dashboard(self.conn, "originating", "IL")["totals"]
+        impacting = endpoints.dashboard(self.conn, "all", "impacting", "IL")["totals"]
+        originating = endpoints.dashboard(self.conn, "all", "originating", "IL")["totals"]
         self.assertEqual((impacting["events"], impacting["ongoing_events"]), (2, 1))
         self.assertEqual((originating["events"], originating["ongoing_events"]), (1, 0))
+        self.assertEqual(endpoints.dashboard(self.conn, "usda", "impacting", "IL")["totals"]["events"], 0)
 
     def test_states_map(self):
-        states = endpoints.states(self.conn)["states"]
+        states = endpoints.states(self.conn, "all")["states"]
+        self.assertEqual(endpoints.states(self.conn, "usda")["states"]["IL"]["impacting"]["events"], 0)
         self.assertEqual(states["IL"]["impacting"]["events"], 2)
         self.assertEqual(states["IL"]["impacting"]["via_nationwide"], 1)
         self.assertEqual(states["CA"]["originating"]["ongoing"], 1)
@@ -74,6 +78,55 @@ class EndpointTests(unittest.TestCase):
         self.assertEqual(by_id["100"]["class"], "II")
         self.assertEqual((by_id["200"]["nationwide"], by_id["200"]["open"], by_id["200"]["origin"]), (1, 1, "CA"))
         self.assertLessEqual(len(by_id["100"]["snippet"]), endpoints.SNIPPET_CHARS)
+
+    def trend_db(self):
+        """FDA recalls in 2014 (base year) and 2020, plus one USDA notice in each."""
+        from fda_recall import clean, load, usda
+        from tests.test_usda import FULL_NOTICE
+        conn = build_db([
+            make_record(recall_number="F-0001-2014", event_id="1", report_date="20140115"),
+            make_record(recall_number="F-0002-2014", event_id="2", report_date="20140715"),
+            make_record(recall_number="F-0001-2020", event_id="3", report_date="20200115"),
+        ])
+        notices = [{**FULL_NOTICE, "recall_number": "001-2014", "recall_date": "2014-01-10"},
+                   {**FULL_NOTICE, "recall_number": "002-2020", "recall_date": "2020-01-10"}]
+        body = usda.dumps({"source": "x", "fetched_at": "x", "record_count": 2, "records": notices}).encode()
+        load.load_usda_document(conn, "fsis.json", body)
+        clean.rebuild(conn)
+        return conn
+
+    def test_trends_per_agency(self):
+        t = endpoints.trends(self.trend_db())
+        self.assertIsNone(t["media_source"])
+        years = {y["year"]: y for y in t["years"]}
+        self.assertEqual((years[2014]["fda_events"], years[2014]["usda_events"], years[2014]["events"]), (2, 1, 3))
+        self.assertEqual((years[2014]["fda_index"], years[2014]["usda_index"]), (100.0, 100.0))
+        self.assertTrue(years[2020]["partial"])  # the data ends in January 2020
+        self.assertIsNone(years[2020]["media_index"])
+        self.assertEqual(t["ongoing_now"], {"fda": 0, "usda": 2})
+
+    def test_trends_with_media(self):
+        from fda_recall import media
+        conn = self.trend_db()
+        conn.executescript(media.MEDIA_SCHEMA)
+        conn.executemany(
+            "INSERT INTO media_attention VALUES ('nyt', ?, ?, ?, '2026-01-01')",
+            [("2014-01", "food_recall", 5), ("2014-01", "all", 1000), ("2020-01", "food_recall", 20), ("2020-01", "all", 1000)],
+        )
+        t = endpoints.trends(conn)
+        self.assertEqual(t["media_source"], "The New York Times")
+        years = {y["year"]: y for y in t["years"]}
+        self.assertEqual((years[2014]["media_articles"], years[2014]["media_index"]), (5, 100.0))
+        self.assertEqual(years[2020]["media_index"], 400.0)
+
+    def test_usda_event_has_notice(self):
+        conn = self.trend_db()
+        data = endpoints.event(conn, "USDA-001-2014")
+        self.assertEqual((data["event"]["agency"], data["event"]["recall_type"]), ("USDA", "recall"))
+        self.assertIn("Sempio Food Services", data["notice"])
+        rows = endpoints.search_index(conn)
+        agency_col = rows["columns"].index("agency")
+        self.assertEqual(sorted({r[agency_col] for r in rows["rows"]}), ["FDA", "USDA"])
 
     def test_export_writes_every_path(self):
         with tempfile.TemporaryDirectory() as tmp:
