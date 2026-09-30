@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recall details · FDA Food Recalls</title>
+  <meta name="description" content="Details of an FDA food recall event: products, reasons, distribution and firm history.">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="event.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <nav class="breadcrumb"><a href="./">← All recalls</a></nav>
+
+    <main id="content">
+      <header class="page-header">
+        <h1 id="firm">Loading…</h1>
+        <p class="subtitle" id="event-subtitle"></p>
+      </header>
+
+      <section class="badges" id="badges"></section>
+
+      <div class="grid-2 event-top">
+        <section class="card">
+          <h2>About this recall</h2>
+          <dl class="facts" id="facts"></dl>
+        </section>
+        <section class="card">
+          <h2>Where it was distributed</h2>
+          <p class="card-note" id="reach-note"></p>
+          <div class="chart" id="reach-map"></div>
+          <details><summary>FDA's distribution text</summary><p class="raw-text" id="distribution-text"></p></details>
+        </section>
+      </div>
+
+      <section class="card" id="reason-card">
+        <h2>Why it was recalled</h2>
+        <div id="reasons"></div>
+      </section>
+
+      <section class="card">
+        <h2 id="products-title">Products</h2>
+        <p class="card-note">Each product has its own FDA recall number.</p>
+        <div class="products" id="products"></div>
+      </section>
+
+      <section class="card" id="history-card" hidden>
+        <h2>Other recalls by this firm</h2>
+        <div class="table-scroll" id="firm-history"></div>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      Source: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a>.
+      Categories, sizes and locations are derived from FDA's free-text fields and are approximate.
+    </footer>
+  </div>
+</body>
+</html>

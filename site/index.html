@@ -24,6 +24,14 @@
       <label for="scope" class="visually-hidden">State</label>
       <select id="scope" name="scope"></select>
     </form>
+    <form class="filters search-row" id="search" role="search">
+      <div class="search">
+        <label for="search-input" class="visually-hidden">Find a recall</label>
+        <input id="search-input" type="search" placeholder="Recall number, UPC or event ID" autocomplete="off">
+        <button type="submit">Find</button>
+      </div>
+    </form>
+    <div class="search-results" id="search-results" aria-live="polite"></div>
 
     <main id="content">
       <section class="card map-card">

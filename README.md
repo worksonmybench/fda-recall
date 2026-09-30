@@ -40,6 +40,10 @@ How it fits together:
 - `site/` is plain HTML/CSS/JS modules, with no build step or chart library. It fetches `api/<path>.json` with relative URLs, so it works from any base path.
 - To add a stat: add or extend an endpoint, then render it in `site/app.js`.
 
+Each recall event has a details page, `event.html?id=<event_id>`, built from `api/event/<id>.json`: the firm, dates, class, status, size, a map of where it was distributed, the reason(s), every product (recall number, description, quantity, lot codes, UPCs) and the firm's other recalls. Pages are per event rather than per recall number because an event is one firm's single recall announcement, while recall numbers are FDA's per-product entries within it. Products differ only in description, codes and occasionally class or reason, and those are shown per product. Link to one product with `event.html?id=99611#H-1364-2026`. The search box on the main page takes a recall number, UPC (with or without its leading zero or check digit) or event ID. It uses `api/lookup.json` (about 175 KB compressed), which is fetched only when someone searches.
+
+The full export is about 8,000 files, around 9 MB compressed.
+
 The main page leads with a tile map of ongoing recalls per state. Its toggle switches between **recalls impacting a state** (the distribution reached it; nationwide recalls count everywhere) and **recalls originating from a state** (the recalling firm is located there). Selecting a state scopes the whole dashboard to it, and the view and state are kept in the URL (`#originating/CA`), so links can be shared.
 
 ## Tables

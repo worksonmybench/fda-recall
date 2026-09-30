@@ -188,3 +188,59 @@ def dashboard(conn, view, scope):
         "by_size": by_size,
         "recent": recent,
     }
+
+
+# --- event details ----------------------------------------------------------
+
+def event_ids(conn):
+    return [r[0] for r in conn.execute("SELECT event_id FROM events ORDER BY event_id")]
+
+
+@endpoint("event/{event_id}", event_id=event_ids)
+def event(conn, event_id):
+    e = _rows(conn, "SELECT * FROM events WHERE event_id = ?", (event_id,))[0]
+    e["states"] = [r[0] for r in conn.execute(
+        "SELECT state FROM event_states WHERE event_id = ? ORDER BY state", (event_id,))]
+
+    products = _rows(conn, """
+        SELECT recall_number, status, classification, product_category, product_description,
+               product_quantity, code_info, more_code_info, reason_for_recall, reason_category,
+               center_classification_date, termination_date, illness_reported
+        FROM products WHERE event_id = ? ORDER BY recall_number""", (event_id,))
+    numbers = [p["recall_number"] for p in products]
+    marks = ",".join("?" * len(numbers))
+
+    upcs, tags, sources = {}, {}, {}
+    for number, upc in conn.execute(f"SELECT recall_number, upc FROM product_upcs WHERE recall_number IN ({marks}) ORDER BY upc", numbers):
+        upcs.setdefault(number, []).append(upc)
+    for number, category, detail in conn.execute(
+            f"SELECT recall_number, category, detail FROM product_reason_tags WHERE recall_number IN ({marks})", numbers):
+        tags.setdefault(number, []).append({"category": category, "detail": detail})
+    for number, source in conn.execute(
+            f"SELECT recall_number, source FROM product_detection_sources WHERE recall_number IN ({marks})", numbers):
+        sources.setdefault(number, []).append(source)
+    for p in products:
+        p["upcs"] = upcs.get(p["recall_number"], [])
+        p["reason_tags"] = tags.get(p["recall_number"], [])
+        p["detection_sources"] = sources.get(p["recall_number"], [])
+
+    # Other recall events by the same firm (name variants combined via firm_key).
+    firm_history = _rows(conn, """
+        SELECT e.event_id, e.report_date, e.most_severe_class, e.size,
+               (SELECT reason_category FROM products p WHERE p.event_id = e.event_id
+                ORDER BY reason_category = 'other' LIMIT 1) AS reason_category
+        FROM events e WHERE e.firm_key = ? AND e.event_id <> ?
+        ORDER BY e.report_date DESC LIMIT 25""", (e["firm_key"], event_id))
+
+    return {"event": e, "products": products, "firm_history": firm_history}
+
+
+@endpoint("lookup")
+def lookup(conn):
+    """Recall number -> event and UPC -> events, for the search box. Fetched only on search."""
+    recalls = dict(conn.execute("SELECT recall_number, event_id FROM products"))
+    upcs = {}
+    for upc, event_id in conn.execute(
+            "SELECT DISTINCT u.upc, p.event_id FROM product_upcs u JOIN products p USING (recall_number) ORDER BY 1, 2"):
+        upcs.setdefault(upc, []).append(event_id)
+    return {"recalls": recalls, "upcs": upcs}

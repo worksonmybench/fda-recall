@@ -4,22 +4,8 @@ import {
   formatNumber, renderHBars, renderLegend, renderStackedColumns, renderTable,
 } from "./charts.js";
 import { MAP_CODES, renderMapLegend, renderTileMap } from "./map.js";
+import { label } from "./labels.js";
 
-const LABELS = {
-  // recall reasons
-  pathogen: "Pathogen", undeclared_allergen: "Undeclared allergen", foreign_material: "Foreign material",
-  processing: "Processing / spoilage", labeling: "Other labeling", chemical: "Chemical contaminant",
-  sanitation: "Sanitation / GMP", temperature_abuse: "Temperature abuse", unapproved_drug: "Unapproved drug",
-  supplier_recall: "Supplier recall", regulatory_order: "Court order", other: "Other / unclear",
-  // product categories
-  produce: "Produce", bakery: "Bakery", prepared_foods: "Prepared foods", dairy: "Dairy",
-  sauces_condiments: "Sauces & condiments", dietary_supplements: "Dietary supplements",
-  grains_pasta_cereal: "Grains, pasta & cereal", spices_seasonings: "Spices & seasonings",
-  nuts_seeds: "Nuts & seeds", seafood: "Seafood", frozen_dessert: "Ice cream & frozen desserts",
-  candy_chocolate: "Candy & chocolate", snacks: "Snacks", beverages: "Beverages", meat_poultry: "Meat & poultry",
-  infant_formula_baby_food: "Infant formula & baby food", eggs: "Eggs", unknown: "Unknown",
-};
-const label = (key) => LABELS[key] ?? key;
 
 const CLASS_SERIES = [
   { key: "class_1", label: "Class I", color: "--class-1" },
@@ -135,12 +121,65 @@ function renderDashboard(d) {
 
   renderTable($("recent-table"), [
     { label: "Reported", value: (r) => r.report_date },
-    { label: "Firm", value: (r) => r.recalling_firm },
+    { label: "Firm", value: (r) => r.recalling_firm, href: (r) => eventUrl(r.event_id) },
     { label: "Reason", value: (r) => label(r.reason_category) },
     { label: "Class", value: (r) => r.most_severe_class ?? "Not yet classified" },
     { label: "Size", value: (r) => r.size ?? "Unknown" },
     { label: "Reach", value: (r) => (r.is_nationwide ? "Nationwide" : r.state_count ? `${r.state_count} state${r.state_count === 1 ? "" : "s"}` : "Not stated") },
   ], d.recent);
+}
+
+const eventUrl = (id) => `event.html?id=${encodeURIComponent(id)}`;
+
+// --- search: recall number, UPC or event ID -> event page ----------------------
+
+let lookupPromise = null; // the lookup file is only fetched when someone searches
+
+async function findEvents(query) {
+  lookupPromise ??= getJSON("lookup");
+  const { recalls, upcs } = await lookupPromise;
+  const q = query.trim().toUpperCase();
+  if (recalls[q]) return [recalls[q]];
+  const eventIds = new Set(Object.values(recalls));
+  if (eventIds.has(q)) return [q];
+  const digits = q.replace(/\D/g, "");
+  if (digits.length >= 8) {
+    // UPCs are stored as printed, so compare without leading zeros, then without the check digit.
+    const strip = (s) => s.replace(/^0+/, "");
+    for (const target of [strip(digits), strip(digits.slice(0, -1))]) {
+      const hits = Object.entries(upcs).filter(([upc]) => strip(upc) === target || strip(upc.slice(0, -1)) === target);
+      if (hits.length) return [...new Set(hits.flatMap(([, ids]) => ids))];
+    }
+  }
+  return [];
+}
+
+async function runSearch(query) {
+  const out = $("search-results");
+  if (!query.trim()) return out.replaceChildren();
+  out.textContent = "Searching…";
+  const ids = await findEvents(query);
+  if (ids.length === 1) {
+    const recall = query.trim().toUpperCase();
+    location.href = eventUrl(ids[0]) + (/[A-Z]/.test(recall) ? `#${encodeURIComponent(recall)}` : "");
+    return;
+  }
+  if (!ids.length) {
+    out.textContent = "No recall found. Try a recall number like F-1234-2020, a UPC, or an FDA event ID.";
+    return;
+  }
+  // Several events share this UPC: list them with firm and date.
+  const events = await Promise.all(ids.slice(0, 20).map((id) => getJSON(`event/${id}`)));
+  const list = document.createElement("ul");
+  for (const { event: e } of events) {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = eventUrl(e.event_id);
+    a.textContent = `${e.recalling_firm}, reported ${e.report_date}`;
+    li.append(a);
+    list.append(li);
+  }
+  out.replaceChildren(`${ids.length} recall events include this UPC:`, list);
 }
 
 // --- actions -----------------------------------------------------------------
@@ -192,6 +231,10 @@ async function init() {
   syncControls();
 
   select.addEventListener("change", () => selectScope(select.value));
+  $("search").addEventListener("submit", (e) => {
+    e.preventDefault();
+    runSearch($("search-input").value).catch((err) => { $("search-results").textContent = err.message; });
+  });
   for (const input of document.querySelectorAll('input[name="view"]')) {
     input.addEventListener("change", () => input.checked && selectView(input.value));
   }

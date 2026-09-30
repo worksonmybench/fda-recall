@@ -62,7 +62,12 @@ export function renderTable(container, columns, rows) {
     const tr = el("tr");
     for (const c of columns) {
       const v = c.value(r);
-      tr.append(el("td", c.numeric ? { class: "num" } : {}, c.numeric ? formatNumber(v) : v ?? ""));
+      const text = c.numeric ? formatNumber(v) : v ?? "";
+      const td = el("td", c.numeric ? { class: "num" } : {});
+      const href = c.href?.(r);
+      if (href) td.append(el("a", { href }, text));
+      else td.textContent = text;
+      tr.append(td);
     }
     table.tBodies[0].append(tr);
   }

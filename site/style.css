@@ -52,6 +52,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body { background: #f9f9f7; }
 @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) body { background: #0d0d0d; } }
@@ -204,3 +205,43 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   position: absolute !important; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0; padding: 0; margin: -1px;
 }
+
+/* --- event page ------------------------------------------------------------ */
+.breadcrumb { font-size: 14px; margin-bottom: 12px; }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.badge {
+  display: inline-flex; flex-direction: column; gap: 1px; padding: 8px 12px;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+}
+.badge-label { font-size: 12px; color: var(--text-secondary); }
+.badge-value { font-size: 15px; font-weight: 600; }
+.event-top { margin-bottom: 16px; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 8px 0 0; font-size: 14px; }
+.facts dt { color: var(--text-secondary); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts.compact { font-size: 13px; gap: 3px 12px; }
+.reach-map .tile-code.small { font-size: 9px; font-weight: 600; }
+.raw-text { white-space: pre-line; overflow-wrap: anywhere; font-size: 14px; margin: 8px 0 0; }
+.reason-block + .reason-block { border-top: 1px solid var(--grid); margin-top: 12px; padding-top: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-primary); background: var(--page); }
+.chip-strong { font-weight: 600; border-color: var(--text-secondary); }
+.small { font-size: 12px; }
+.products { display: grid; gap: 10px; }
+.product { border: 1px solid var(--border); border-radius: 10px; padding: 12px; scroll-margin-top: 16px; }
+.product.highlight, .product:target { border-color: var(--text-primary); box-shadow: 0 0 0 1px var(--text-primary); }
+.product-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 13px; }
+.recall-number { font-weight: 600; font-size: 14px; }
+.product-desc { margin: 6px 0; font-size: 14px; overflow-wrap: anywhere; }
+
+/* --- search ------------------------------------------------------------------ */
+.search { display: flex; gap: 6px; margin-left: auto; }
+.search input {
+  font: inherit; color: var(--text-primary); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; width: 230px; max-width: 100%;
+}
+.search button {
+  font: inherit; color: #ffffff; background: var(--seq-5-strong); border: 0; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+.search-results { margin: -4px 0 16px; font-size: 14px; }
+.search-results ul { margin: 4px 0 0; padding-left: 20px; }

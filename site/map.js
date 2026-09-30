@@ -153,3 +153,34 @@ export function renderMapLegend(container, bounds) {
 }
 
 export const MAP_CODES = LAYOUT.map(([code]) => code);
+
+/** Small static map highlighting the states one recall reached. */
+export function renderReachMap(container, { states = [], nationwide = false, names = {} }) {
+  const reached = new Set(states);
+  const width = Math.min(420, Math.max(240, container.clientWidth));
+  const gap = 2;
+  const size = Math.floor((width - gap * (COLS - 1)) / COLS);
+  const mapW = size * COLS + gap * (COLS - 1);
+  const mapH = size * ROWS + gap * (ROWS - 1);
+  const svg = el("svg", {
+    width: mapW, height: mapH, viewBox: `0 0 ${mapW} ${mapH}`, class: "tile-map reach-map", role: "img",
+    "aria-label": nationwide ? "Distributed nationwide" : `Distributed to ${reached.size} states and territories`,
+  });
+  for (const [code, col, row] of LAYOUT) {
+    // Nationwide covers the 50 states + DC, not the territories.
+    const on = reached.has(code) || (nationwide && !["PR", "GU", "VI", "AS", "MP"].includes(code));
+    const x = col * (size + gap);
+    const y = row * (size + gap);
+    const g = el("g", { class: "tile" });
+    g.append(el("title", {}, `${names[code] ?? code}: ${on ? "reached" : "not listed"}`));
+    g.append(el("rect", { x, y, width: size, height: size, rx: 3, fill: on ? "var(--seq-5)" : "var(--seq-0)" }));
+    if (size >= 22) {
+      g.append(el("text", {
+        x: x + size / 2, y: y + size / 2, fill: on ? "var(--seq-ink-5)" : "var(--seq-ink-0)",
+        "text-anchor": "middle", "dominant-baseline": "middle", class: "tile-code small",
+      }, code));
+    }
+    svg.append(g);
+  }
+  container.replaceChildren(svg);
+}

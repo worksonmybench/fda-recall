@@ -48,6 +48,22 @@ class EndpointTests(unittest.TestCase):
         self.assertEqual(states["CA"]["originating"]["ongoing"], 1)
         self.assertEqual(states["GU"]["originating"]["events"], 0)  # zero-filled
 
+    def test_event_details(self):
+        data = endpoints.event(self.conn, "100")
+        self.assertEqual(data["event"]["event_id"], "100")
+        self.assertEqual(data["event"]["states"], ["IL"])
+        [product] = data["products"]
+        self.assertEqual(product["recall_number"], "F-0001-2020")
+        self.assertEqual(product["reason_tags"], [{"category": "undeclared_allergen", "detail": "milk"}])
+        self.assertEqual(data["firm_history"][0]["event_id"], "200")  # same firm, other event
+        self.assertIsNotNone(endpoints.resolve(self.conn, "event/200"))
+        self.assertIsNone(endpoints.resolve(self.conn, "event/999"))
+
+    def test_lookup(self):
+        data = endpoints.lookup(self.conn)
+        self.assertEqual(data["recalls"], {"F-0001-2020": "100", "F-0002-2020": "200"})
+        self.assertEqual(data["upcs"], {})
+
     def test_export_writes_every_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "recalls.db"
