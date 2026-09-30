@@ -36,7 +36,7 @@ Fields openFDA adds later are kept in `raw_json` and reported during the load, s
 
 | table | contents |
 |---|---|
-| `events` | one row per recall event: firm, address, distribution, initiation/report dates, plus `firm_key`, `product_count`, `most_severe_class`, `ongoing_product_count` |
+| `events` | one row per recall event: firm, address, distribution, initiation/report dates, plus `firm_key`, `product_count`, `most_severe_class`, `ongoing_product_count`, `est_units`, `size` |
 | `products` | one row per recall number (product), linked by `event_id`; `reason_category` is its main recall reason |
 | `product_reason_tags` | every `(category, detail)` matched in the recall reason, e.g. `pathogen / listeria`, `undeclared_allergen / peanut`; a product can have several |
 | `data_issues` | records that failed a sanity check, for manual review; nothing is auto-corrected |
@@ -44,6 +44,21 @@ Fields openFDA adds later are kept in `raw_json` and reported during the load, s
 Cleanup applied: whitespace trimmed and collapsed (line breaks kept), placeholders like `N/A` turned into NULL, and `firm_key` added for matching firm-name variants (`Ventura Foods, LLC` = `VENTURA FOODS LLC`).
 
 Note: one event covers many products, so decide whether you're counting events or products.
+
+### Recall size
+
+`fda_recall/quantity.py` parses the free-text `product_quantity` ("1,221 cases (6/2 lb. bags per case)", "528,250 lbs", "Approx 19.5 gallons") into rough **estimated retail units**: a unit/bottle/bag = 1, a case = 12, a pallet = 600, 1 lb = 1, volumes via the weight of water. Each event's products are combined (identical quantity text counted once, since it's usually a shared total) into `events.est_units`, then bucketed by order of magnitude:
+
+| size | est. retail units |
+|---|---|
+| XS | under 100 |
+| S | 100 – 999 |
+| M | 1,000 – 9,999 |
+| L | 10,000 – 99,999 |
+| XL | 100,000 – 999,999 |
+| XXL | 1 million + |
+
+`size` is NULL when no quantity was given ("Unknown"). The estimates are only good to an order of magnitude — use `size` for comparisons, not `est_units` for totals. Per-product values are in `products.est_units` / `quantity_unit_type` / `quantity_is_total`.
 
 ### Recall reason categories
 
@@ -76,6 +91,11 @@ JOIN products p USING (event_id)
 JOIN product_reason_tags t USING (recall_number)
 WHERE t.category = 'pathogen' AND t.detail = 'listeria'
 GROUP BY yr ORDER BY yr;
+
+-- Recall events by size and main reason
+SELECT e.size, p.reason_category, count(DISTINCT e.event_id) FROM events e
+JOIN products p USING (event_id)
+GROUP BY 1, 2 ORDER BY 2, min(e.est_units);
 
 -- Products by main recall reason
 SELECT reason_category, count(*) FROM products GROUP BY 1 ORDER BY 2 DESC;

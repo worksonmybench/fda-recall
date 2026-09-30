@@ -9,7 +9,8 @@ and re-running is all it takes to apply it to the whole history. Nothing
 in the raw import tables is modified.
 
 Tables produced:
-    events       one row per recall event (firm, address, distribution, dates)
+    events       one row per recall event (firm, address, distribution, dates),
+                 with est_units and a t-shirt size (see quantity.py)
     products     one row per recall_number, linked to events by event_id,
                  with reason_category (see reasons.py)
     product_reason_tags
@@ -22,7 +23,7 @@ import re
 from datetime import date
 from itertools import groupby
 
-from . import db, reasons
+from . import db, quantity, reasons
 
 # Values the FDA uses to mean "no value".
 PLACEHOLDERS = {"", "N/A", "NA", "n/a", "N/a", "None", "none"}
@@ -73,14 +74,19 @@ CREATE TABLE events (
     {", ".join(f"{f} TEXT" for f in EVENT_FIELDS)},
     product_count           INTEGER NOT NULL,
     most_severe_class       TEXT,
-    ongoing_product_count   INTEGER NOT NULL
+    ongoing_product_count   INTEGER NOT NULL,
+    est_units               REAL,
+    size                    TEXT
 );
 
 CREATE TABLE products (
     recall_number           TEXT PRIMARY KEY,
     event_id                TEXT REFERENCES events(event_id),
     {", ".join(f"{f} TEXT" for f in PRODUCT_FIELDS)},
-    reason_category         TEXT NOT NULL
+    reason_category         TEXT NOT NULL,
+    est_units               REAL,
+    quantity_unit_type      TEXT,
+    quantity_is_total       INTEGER
 );
 
 CREATE TABLE product_reason_tags (
@@ -101,6 +107,7 @@ CREATE TABLE data_issues (
 
 CREATE INDEX ix_events_firm_key       ON events(firm_key);
 CREATE INDEX ix_events_report_date    ON events(report_date);
+CREATE INDEX ix_events_size           ON events(size);
 CREATE INDEX ix_products_event        ON products(event_id);
 CREATE INDEX ix_products_class        ON products(classification);
 CREATE INDEX ix_products_status       ON products(status);
@@ -175,6 +182,7 @@ def rebuild(conn):
             flag(rec, "termination_date", "ongoing_with_termination_date", rec["termination_date"])
         if rec["classification"] not in CLASS_SEVERITY:
             flag(rec, "classification", "unclassified", rec["classification"])
+        rec["quantity"] = quantity.parse_quantity(rec["product_quantity"])
         records.append(rec)
 
     events = []
@@ -188,6 +196,7 @@ def rebuild(conn):
             if len(values) > 1:
                 flag(first, f, "event_field_mismatch", " | ".join(sorted(v or "NULL" for v in values)))
         classes = [rec["classification"] for rec in group if rec["classification"] in CLASS_SEVERITY]
+        units = quantity.event_units([(rec["product_quantity"], rec["quantity"]) for rec in group])
         events.append((
             event_id,
             firm_key(first["recalling_firm"]),
@@ -195,6 +204,8 @@ def rebuild(conn):
             len(group),
             min(classes, key=CLASS_SEVERITY.get) if classes else None,
             sum(rec["status"] == "Ongoing" for rec in group),
+            units,
+            quantity.size_bucket(units),
         ))
 
     tag_cache = {}  # many products share the same reason text
@@ -204,16 +215,18 @@ def rebuild(conn):
         if text not in tag_cache:
             tag_cache[text] = reasons.tag_reason(text)
         tags = tag_cache[text]
+        units, unit_type, is_total = rec["quantity"] or (None, None, None)
         products.append((
             rec["raw_recall_number"], rec["event_id"], *(rec[f] for f in PRODUCT_FIELDS),
             reasons.primary_category(tags),
+            units, unit_type, is_total,
         ))
         reason_tags.extend((rec["raw_recall_number"], category, detail) for category, detail in tags)
 
     with conn:
         conn.executescript(SCHEMA)
-        conn.executemany(f"INSERT INTO events VALUES ({', '.join('?' * (len(EVENT_FIELDS) + 5))})", events)
-        conn.executemany(f"INSERT INTO products VALUES ({', '.join('?' * (len(PRODUCT_FIELDS) + 3))})", products)
+        conn.executemany(f"INSERT INTO events VALUES ({', '.join('?' * (len(EVENT_FIELDS) + 7))})", events)
+        conn.executemany(f"INSERT INTO products VALUES ({', '.join('?' * (len(PRODUCT_FIELDS) + 6))})", products)
         conn.executemany("INSERT INTO product_reason_tags VALUES (?, ?, ?)", reason_tags)
         conn.executemany(
             "INSERT INTO data_issues (recall_number, event_id, field, value, issue) VALUES (?, ?, ?, ?, ?)",
@@ -223,7 +236,8 @@ def rebuild(conn):
         "events": len(events),
         "products": len(products),
         "reason_tags": len(reason_tags),
-        "untagged_products": sum(p[-1] == "other" for p in products),
+        "untagged_products": sum(p[len(PRODUCT_FIELDS) + 2] == "other" for p in products),
+        "unsized_events": sum(e[-1] is None for e in events),
         "data_issues": len(issues),
     }
 
@@ -243,6 +257,7 @@ def print_summary(counts):
     print(
         f"Clean tables rebuilt: {counts['events']} events, {counts['products']} products"
         f" ({counts['untagged_products']} with no recall reason category),"
+        f" {counts['unsized_events']} events with no usable quantity,"
         f" {counts['data_issues']} data issues"
     )
 
