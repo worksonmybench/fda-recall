@@ -70,7 +70,10 @@ class RebuildTests(unittest.TestCase):
         ])
         self.assertEqual(
             counts,
-            {"events": 2, "products": 3, "reason_tags": 3, "untagged_products": 0, "unsized_events": 0, "events_without_location": 0, "data_issues": 0},
+            {
+                "events": 2, "products": 3, "reason_tags": 3, "untagged_products": 0, "uncategorized_products": 0,
+                "unsized_events": 0, "events_without_location": 0, "illness_events": 0, "upcs": 0, "data_issues": 0,
+            },
         )
         tags = set(conn.execute("SELECT p.reason_category, t.detail FROM products p JOIN product_reason_tags t USING (recall_number)"))
         self.assertEqual(tags, {("undeclared_allergen", "milk")})
@@ -84,6 +87,10 @@ class RebuildTests(unittest.TestCase):
             conn.execute("SELECT est_units, size FROM events WHERE event_id = '100'").fetchone(), (120.0, "S")
         )
         self.assertEqual(list(conn.execute("SELECT state FROM event_states WHERE event_id = '100'")), [("IL",)])
+        self.assertEqual(
+            conn.execute("SELECT product_category, illness_reported FROM products WHERE recall_number = 'F-0001-2020'").fetchone(),
+            ("snacks", 0),  # "Widget crackers"
+        )
         desc = conn.execute("SELECT product_description FROM products WHERE recall_number = 'F-0001-2020'").fetchone()
         self.assertEqual(desc, ("Widget crackers",))
 
@@ -94,6 +101,16 @@ class RebuildTests(unittest.TestCase):
         )
         reach = conn.execute("SELECT count(*), min(via_nationwide) FROM event_state_reach").fetchone()
         self.assertEqual(reach, (51, 1))
+
+    def test_upcs_detection_and_illness(self):
+        conn, counts = self.rebuild([make_record(
+            product_description="Acme Cookies, UPC 0-12345-67890-5",
+            reason_for_recall="FDA sampling found Salmonella. Illnesses have been reported.",
+        )])
+        self.assertEqual(list(conn.execute("SELECT upc FROM product_upcs")), [("012345678905",)])
+        self.assertEqual(list(conn.execute("SELECT source FROM product_detection_sources")), [("regulator_testing",)])
+        self.assertEqual(conn.execute("SELECT illness_reported FROM events").fetchone(), (1,))
+        self.assertEqual(counts["illness_events"], 1)
 
     def test_issues_are_flagged(self):
         conn, _ = self.rebuild([

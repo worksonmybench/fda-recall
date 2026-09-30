@@ -36,10 +36,12 @@ Fields openFDA adds later are kept in `raw_json` and reported during the load, s
 
 | table | contents |
 |---|---|
-| `events` | one row per recall event: firm, address, distribution, initiation/report dates, plus `firm_key`, `product_count`, `most_severe_class`, `ongoing_product_count`, `est_units`, `size`, `is_nationwide`, `is_foreign`, `is_online`, `state_count` |
+| `events` | one row per recall event: firm, address, distribution, initiation/report dates, plus `firm_key`, `product_count`, `most_severe_class`, `ongoing_product_count`, `est_units`, `size`, `is_nationwide`, `is_foreign`, `is_online`, `state_count`, `illness_reported` (any product) |
 | `event_states` | the US states / territories (2-letter codes) named in each event's `distribution_pattern` |
 | `event_state_reach` (view) | `event_states` plus all 50 states + DC for nationwide events; `via_nationwide` = 1 for those added rows |
-| `products` | one row per recall number (product), linked by `event_id`; `reason_category` is its main recall reason |
+| `products` | one row per recall number (product), linked by `event_id`; `reason_category` (main recall reason), `product_category` (kind of food), `illness_reported` |
+| `product_detection_sources` | how the problem was found, e.g. `regulator_testing`, `supplier_notification`; a product can have several, most have none stated |
+| `product_upcs` | UPC / EAN codes (digits only) found in the product description |
 | `product_reason_tags` | every `(category, detail)` matched in the recall reason, e.g. `pathogen / listeria`, `undeclared_allergen / peanut`; a product can have several |
 | `data_issues` | records that failed a sanity check, for manual review; nothing is auto-corrected |
 
@@ -72,6 +74,21 @@ Note: one event covers many products, so decide whether you're counting events o
 - `is_foreign`: mentions another country or foreign/international distribution, ignoring "no foreign distribution" style negations
 
 Codes that are also words (IN, OR, ME, OK…) only count in upper case in normal text, and only inside a list in all-caps text. About 400 events name no states and aren't nationwide ("Domestic distribution only", "Canada only", "Unknown"). To ask which recalls reached a state, use `event_state_reach` so nationwide recalls are included.
+
+### Product category
+
+`fda_recall/products.py` assigns a kind of food from `product_description` (about 94% of products): `produce`, `bakery`, `prepared_foods`, `dairy`, `sauces_condiments`, `dietary_supplements`, `grains_pasta_cereal`, `spices_seasonings`, `nuts_seeds`, `seafood`, `frozen_dessert`, `candy_chocolate`, `snacks`, `beverages`, `meat_poultry`, `infant_formula_baby_food`, `eggs`. It looks only at the product name (the text before "Ingredients", "Net Wt", "UPC"...; "X with Y" / "X in Y" become X) and uses the **last** food word in it, since that's the head noun: "Chocolate Chip Cookie Dough Ice Cream" is `frozen_dessert`, "Peanut Butter Cookies" is `bakery`. NULL means only a brand name was given ("CardioAdvance").
+
+### UPCs
+
+Codes after a "UPC" label are read as a list ("UPC 74690-028590; and 8 oz., UPC 74690-231556"); a bare 12–13 digit number counts only if its check digit is valid and it isn't labelled as a lot / item / SKU number. Codes are stored as the digits given, so the same product can appear with and without a leading zero or check digit.
+
+### How it was found, and illnesses
+
+`fda_recall/detection.py` reads `reason_for_recall`:
+
+- `product_detection_sources`: `supplier_notification`, `regulator_testing`, `consumer_complaint`, `firm_testing`, `regulator_inspection`, `illness_investigation`, `customer_testing`, `label_or_record_review`. Only about 1 in 8 events says how the problem was found.
+- `illness_reported`: the text says illnesses, reactions or an outbreak actually happened. Boilerplate ("an organism which can cause serious and sometimes fatal infections") and negations ("No illnesses have been reported") don't count.
 
 ### Recall reason categories
 
@@ -115,6 +132,17 @@ SELECT p.reason_category, count(DISTINCT r.event_id) FROM event_state_reach r
 JOIN products p USING (event_id)
 WHERE r.state = 'TX'
 GROUP BY 1 ORDER BY 2 DESC;
+
+-- Kinds of food in Listeria recall events
+SELECT p.product_category, count(DISTINCT p.event_id) FROM products p
+JOIN product_reason_tags t USING (recall_number)
+WHERE t.category = 'pathogen' AND t.detail = 'listeria'
+GROUP BY 1 ORDER BY 2 DESC;
+
+-- Every recall of a given UPC
+SELECT p.recall_number, e.report_date, p.reason_for_recall FROM product_upcs u
+JOIN products p USING (recall_number) JOIN events e USING (event_id)
+WHERE u.upc = '041498205379';
 
 -- Products by main recall reason
 SELECT reason_category, count(*) FROM products GROUP BY 1 ORDER BY 2 DESC;

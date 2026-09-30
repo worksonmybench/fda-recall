@@ -16,9 +16,13 @@ Tables produced:
     event_state_reach (view)
                  event_states plus every state for nationwide events
     products     one row per recall_number, linked to events by event_id,
-                 with reason_category (see reasons.py)
+                 with reason_category (see reasons.py), product_category
+                 (see products.py) and illness_reported (see detection.py)
     product_reason_tags
                  every (category, detail) tag matched in reason_for_recall
+    product_detection_sources
+                 how the problem was found, per reason_for_recall (see detection.py)
+    product_upcs UPC / EAN codes found in product_description (see products.py)
     data_issues  records that failed a sanity check, for manual review
 """
 
@@ -28,7 +32,7 @@ import re
 from datetime import date
 from itertools import groupby
 
-from . import db, distribution, quantity, reasons
+from . import db, detection, distribution, products as product_text, quantity, reasons
 
 # Values the FDA uses to mean "no value".
 PLACEHOLDERS = {"", "N/A", "NA", "n/a", "N/a", "None", "none"}
@@ -71,6 +75,8 @@ SCHEMA = f"""
 DROP VIEW IF EXISTS event_state_reach;
 DROP TABLE IF EXISTS event_states;
 DROP TABLE IF EXISTS product_reason_tags;
+DROP TABLE IF EXISTS product_detection_sources;
+DROP TABLE IF EXISTS product_upcs;
 DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS data_issues;
@@ -87,7 +93,8 @@ CREATE TABLE events (
     is_nationwide           INTEGER NOT NULL,
     is_foreign              INTEGER NOT NULL,
     is_online               INTEGER NOT NULL,
-    state_count             INTEGER NOT NULL
+    state_count             INTEGER NOT NULL,
+    illness_reported        INTEGER NOT NULL
 );
 
 CREATE TABLE event_states (
@@ -113,7 +120,9 @@ CREATE TABLE products (
     reason_category         TEXT NOT NULL,
     est_units               REAL,
     quantity_unit_type      TEXT,
-    quantity_is_total       INTEGER
+    quantity_is_total       INTEGER,
+    product_category        TEXT,
+    illness_reported        INTEGER NOT NULL
 );
 
 CREATE TABLE product_reason_tags (
@@ -121,6 +130,18 @@ CREATE TABLE product_reason_tags (
     category                TEXT NOT NULL,
     detail                  TEXT NOT NULL,
     PRIMARY KEY (recall_number, category, detail)
+);
+
+CREATE TABLE product_detection_sources (
+    recall_number           TEXT NOT NULL REFERENCES products(recall_number),
+    source                  TEXT NOT NULL,
+    PRIMARY KEY (recall_number, source)
+);
+
+CREATE TABLE product_upcs (
+    recall_number           TEXT NOT NULL REFERENCES products(recall_number),
+    upc                     TEXT NOT NULL,
+    PRIMARY KEY (recall_number, upc)
 );
 
 CREATE TABLE data_issues (
@@ -140,6 +161,9 @@ CREATE INDEX ix_products_event        ON products(event_id);
 CREATE INDEX ix_products_class        ON products(classification);
 CREATE INDEX ix_products_status       ON products(status);
 CREATE INDEX ix_products_reason_cat   ON products(reason_category);
+CREATE INDEX ix_products_category     ON products(product_category);
+CREATE INDEX ix_detection_source      ON product_detection_sources(source);
+CREATE INDEX ix_product_upcs_upc      ON product_upcs(upc);
 CREATE INDEX ix_reason_tags_category  ON product_reason_tags(category, detail);
 CREATE INDEX ix_data_issues_issue     ON data_issues(issue);
 """
@@ -211,9 +235,11 @@ def rebuild(conn):
         if rec["classification"] not in CLASS_SEVERITY:
             flag(rec, "classification", "unclassified", rec["classification"])
         rec["quantity"] = quantity.parse_quantity(rec["product_quantity"])
+        rec["illness_reported"] = detection.illness_reported(rec["reason_for_recall"])
         records.append(rec)
 
     events, event_states = [], []
+    unsized_events = events_without_location = untagged_products = 0
     for event_id, group in groupby(records, key=lambda r: r["event_id"]):
         group = list(group)
         if event_id is None:
@@ -240,29 +266,45 @@ def rebuild(conn):
             int(foreign),
             int(online),
             len(states),
+            int(any(rec["illness_reported"] for rec in group)),
         ))
+        unsized_events += units is None
+        events_without_location += not states and not nationwide
 
-    tag_cache = {}  # many products share the same reason text
-    products, reason_tags = [], []
+    # Many products share the same reason text, so cache per text.
+    reason_cache = {}
+    products, reason_tags, detection_rows, upc_rows = [], [], [], []
     for rec in records:
-        text = rec["reason_for_recall"]
-        if text not in tag_cache:
-            tag_cache[text] = reasons.tag_reason(text)
-        tags = tag_cache[text]
+        number, text = rec["raw_recall_number"], rec["reason_for_recall"]
+        if text not in reason_cache:
+            reason_cache[text] = (reasons.tag_reason(text), detection.detection_sources(text))
+        tags, sources = reason_cache[text]
+        category = reasons.primary_category(tags)
+        untagged_products += category == "other"
         units, unit_type, is_total = rec["quantity"] or (None, None, None)
         products.append((
-            rec["raw_recall_number"], rec["event_id"], *(rec[f] for f in PRODUCT_FIELDS),
-            reasons.primary_category(tags),
+            number, rec["event_id"], *(rec[f] for f in PRODUCT_FIELDS),
+            category,
             units, unit_type, is_total,
+            product_text.product_category(rec["product_description"]),
+            int(rec["illness_reported"]),
         ))
-        reason_tags.extend((rec["raw_recall_number"], category, detail) for category, detail in tags)
+        reason_tags.extend((number, c, d) for c, d in tags)
+        detection_rows.extend((number, s) for s in sources)
+        upc_rows.extend((number, upc) for upc in product_text.find_upcs(rec["product_description"]))
 
     with conn:
         conn.executescript(SCHEMA)
-        conn.executemany(f"INSERT INTO events VALUES ({', '.join('?' * (len(EVENT_FIELDS) + 11))})", events)
-        conn.executemany("INSERT INTO event_states VALUES (?, ?)", event_states)
-        conn.executemany(f"INSERT INTO products VALUES ({', '.join('?' * (len(PRODUCT_FIELDS) + 6))})", products)
-        conn.executemany("INSERT INTO product_reason_tags VALUES (?, ?, ?)", reason_tags)
+        for table, rows in [
+            ("events", events),
+            ("event_states", event_states),
+            ("products", products),
+            ("product_reason_tags", reason_tags),
+            ("product_detection_sources", detection_rows),
+            ("product_upcs", upc_rows),
+        ]:
+            if rows:
+                conn.executemany(f"INSERT INTO {table} VALUES ({', '.join('?' * len(rows[0]))})", rows)
         conn.executemany(
             "INSERT INTO data_issues (recall_number, event_id, field, value, issue) VALUES (?, ?, ?, ?, ?)",
             issues,
@@ -271,9 +313,12 @@ def rebuild(conn):
         "events": len(events),
         "products": len(products),
         "reason_tags": len(reason_tags),
-        "untagged_products": sum(p[len(PRODUCT_FIELDS) + 2] == "other" for p in products),
-        "unsized_events": sum(e[len(EVENT_FIELDS) + 6] is None for e in events),
-        "events_without_location": sum(not e[-1] and not e[-4] for e in events),
+        "untagged_products": untagged_products,
+        "uncategorized_products": sum(p[-2] is None for p in products),
+        "unsized_events": unsized_events,
+        "events_without_location": events_without_location,
+        "illness_events": sum(e[-1] for e in events),
+        "upcs": len(upc_rows),
         "data_issues": len(issues),
     }
 
@@ -291,11 +336,12 @@ def main(argv=None):
 
 def print_summary(counts):
     print(
-        f"Clean tables rebuilt: {counts['events']} events, {counts['products']} products"
-        f" ({counts['untagged_products']} with no recall reason category),"
-        f" {counts['unsized_events']} events with no usable quantity,"
-        f" {counts['events_without_location']} with no states or nationwide flag,"
-        f" {counts['data_issues']} data issues"
+        f"Clean tables rebuilt: {counts['events']} events, {counts['products']} products, {counts['upcs']} UPCs,"
+        f" {counts['illness_events']} events with illnesses reported, {counts['data_issues']} data issues\n"
+        f"  not classified: {counts['untagged_products']} products without a recall reason category,"
+        f" {counts['uncategorized_products']} without a product category,"
+        f" {counts['unsized_events']} events without a usable quantity,"
+        f" {counts['events_without_location']} without states or a nationwide flag"
     )
 
 
