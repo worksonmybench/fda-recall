@@ -68,7 +68,12 @@ class RebuildTests(unittest.TestCase):
             make_record(recall_number="F-0002-2020", classification="Class I", status="Ongoing", termination_date=""),
             make_record(recall_number="F-0003-2020", event_id="200"),
         ])
-        self.assertEqual(counts, {"events": 2, "products": 3, "data_issues": 0})
+        self.assertEqual(
+            counts,
+            {"events": 2, "products": 3, "reason_tags": 3, "untagged_products": 0, "data_issues": 0},
+        )
+        tags = set(conn.execute("SELECT p.reason_category, t.detail FROM products p JOIN product_reason_tags t USING (recall_number)"))
+        self.assertEqual(tags, {("undeclared_allergen", "milk")})
         row = conn.execute(
             "SELECT address_2, firm_key, product_count, most_severe_class, ongoing_product_count"
             " FROM events WHERE event_id = '100'"

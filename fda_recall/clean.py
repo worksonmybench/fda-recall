@@ -10,7 +10,10 @@ in the raw import tables is modified.
 
 Tables produced:
     events       one row per recall event (firm, address, distribution, dates)
-    products     one row per recall_number, linked to events by event_id
+    products     one row per recall_number, linked to events by event_id,
+                 with reason_category (see reasons.py)
+    product_reason_tags
+                 every (category, detail) tag matched in reason_for_recall
     data_issues  records that failed a sanity check, for manual review
 """
 
@@ -19,7 +22,7 @@ import re
 from datetime import date
 from itertools import groupby
 
-from . import db
+from . import db, reasons
 
 # Values the FDA uses to mean "no value".
 PLACEHOLDERS = {"", "N/A", "NA", "n/a", "N/a", "None", "none"}
@@ -59,6 +62,7 @@ MIN_PLAUSIBLE_YEAR = 1990
 CLASS_SEVERITY = {"Class I": 1, "Class II": 2, "Class III": 3}
 
 SCHEMA = f"""
+DROP TABLE IF EXISTS product_reason_tags;
 DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS data_issues;
@@ -75,7 +79,15 @@ CREATE TABLE events (
 CREATE TABLE products (
     recall_number           TEXT PRIMARY KEY,
     event_id                TEXT REFERENCES events(event_id),
-    {", ".join(f"{f} TEXT" for f in PRODUCT_FIELDS)}
+    {", ".join(f"{f} TEXT" for f in PRODUCT_FIELDS)},
+    reason_category         TEXT NOT NULL
+);
+
+CREATE TABLE product_reason_tags (
+    recall_number           TEXT NOT NULL REFERENCES products(recall_number),
+    category                TEXT NOT NULL,
+    detail                  TEXT NOT NULL,
+    PRIMARY KEY (recall_number, category, detail)
 );
 
 CREATE TABLE data_issues (
@@ -92,6 +104,8 @@ CREATE INDEX ix_events_report_date    ON events(report_date);
 CREATE INDEX ix_products_event        ON products(event_id);
 CREATE INDEX ix_products_class        ON products(classification);
 CREATE INDEX ix_products_status       ON products(status);
+CREATE INDEX ix_products_reason_cat   ON products(reason_category);
+CREATE INDEX ix_reason_tags_category  ON product_reason_tags(category, detail);
 CREATE INDEX ix_data_issues_issue     ON data_issues(issue);
 """
 
@@ -183,20 +197,35 @@ def rebuild(conn):
             sum(rec["status"] == "Ongoing" for rec in group),
         ))
 
-    products = [
-        (rec["raw_recall_number"], rec["event_id"], *(rec[f] for f in PRODUCT_FIELDS))
-        for rec in records
-    ]
+    tag_cache = {}  # many products share the same reason text
+    products, reason_tags = [], []
+    for rec in records:
+        text = rec["reason_for_recall"]
+        if text not in tag_cache:
+            tag_cache[text] = reasons.tag_reason(text)
+        tags = tag_cache[text]
+        products.append((
+            rec["raw_recall_number"], rec["event_id"], *(rec[f] for f in PRODUCT_FIELDS),
+            reasons.primary_category(tags),
+        ))
+        reason_tags.extend((rec["raw_recall_number"], category, detail) for category, detail in tags)
 
     with conn:
         conn.executescript(SCHEMA)
         conn.executemany(f"INSERT INTO events VALUES ({', '.join('?' * (len(EVENT_FIELDS) + 5))})", events)
-        conn.executemany(f"INSERT INTO products VALUES ({', '.join('?' * (len(PRODUCT_FIELDS) + 2))})", products)
+        conn.executemany(f"INSERT INTO products VALUES ({', '.join('?' * (len(PRODUCT_FIELDS) + 3))})", products)
+        conn.executemany("INSERT INTO product_reason_tags VALUES (?, ?, ?)", reason_tags)
         conn.executemany(
             "INSERT INTO data_issues (recall_number, event_id, field, value, issue) VALUES (?, ?, ?, ?, ?)",
             issues,
         )
-    return {"events": len(events), "products": len(products), "data_issues": len(issues)}
+    return {
+        "events": len(events),
+        "products": len(products),
+        "reason_tags": len(reason_tags),
+        "untagged_products": sum(p[-1] == "other" for p in products),
+        "data_issues": len(issues),
+    }
 
 
 def main(argv=None):
@@ -212,7 +241,8 @@ def main(argv=None):
 
 def print_summary(counts):
     print(
-        f"Clean tables rebuilt: {counts['events']} events, {counts['products']} products,"
+        f"Clean tables rebuilt: {counts['events']} events, {counts['products']} products"
+        f" ({counts['untagged_products']} with no recall reason category),"
         f" {counts['data_issues']} data issues"
     )
 
