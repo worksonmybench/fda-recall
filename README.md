@@ -79,7 +79,7 @@ Note: one event covers many products, so decide whether you're counting events o
 
 ### Recall size
 
-`fda_recall/quantity.py` parses the free-text `product_quantity` ("1,221 cases (6/2 lb. bags per case)", "528,250 lbs", "Approx 19.5 gallons") into rough **estimated retail units**: a unit/bottle/bag = 1, a case = 12, a pallet = 600, 1 lb = 1, volumes via the weight of water. Each event's products are combined (identical quantity text counted once, since it's usually a shared total) into `events.est_units`, then bucketed by order of magnitude:
+`fda_recall/quantity.py` parses the free-text `product_quantity` ("1,221 cases (6/2 lb. bags per case)", "528,250 lbs", "Approx 19.5 gallons") into rough **estimated retail units**: a unit/bottle/bag = 1, 1 lb = 1, volumes via the weight of water. For cases, boxes, cartons and pallets it uses the pack size when the text gives one: "144 units per case", "(12/case)", "cases of 12", "(54 units each)", "(6/2 lb bags per case)", "(20 lbs/case)", "41,436 x 6 x 5 lb". Failing that it uses a unit total FDA stated for the cases ("179 cases (1,432 bottles)"), and failing that 12 per case and 600 per pallet. Each event's products are combined (identical quantity text counted once, since it's usually a shared total) into `events.est_units`, then bucketed by order of magnitude:
 
 | size | est. retail units |
 |---|---|
