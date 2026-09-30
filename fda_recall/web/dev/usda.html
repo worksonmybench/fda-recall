@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Refresh USDA Data · Dev</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="viz-root">
+    <main class="prose">
+      <h1>Refresh USDA recall data</h1>
+      <p>Dev-only tool, not part of the deployed site.</p>
+      <section class="card">
+        <p>USDA FSIS's Recall API blocks scripts but answers normal browser requests. This button has <em>your browser</em> fetch the whole feed, then sends it to the dev server, which saves it to <code>sources/usda/fsis_recalls.json</code> (English records only, summaries as plain text, contact details removed). Commit that file afterwards.</p>
+        <p><button type="button" id="refresh" class="primary">Fetch from FSIS and save</button></p>
+        <div id="status" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+  <script type="module">
+    const FSIS_URL = "https://www.fsis.usda.gov/fsis/api/recall/v/1";
+    const status = document.getElementById("status");
+    const button = document.getElementById("refresh");
+    const line = (text) => { const p = document.createElement("p"); p.textContent = text; status.append(p); return p; };
+
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      status.replaceChildren();
+      try {
+        line("Fetching the feed from FSIS…");
+        const res = await fetch(FSIS_URL);
+        if (!res.ok) throw new Error(`FSIS answered ${res.status}`);
+        const raw = await res.json();
+        line(`Got ${raw.length.toLocaleString()} records. Saving…`);
+        const save = await fetch("/dev/usda-import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-FDA-Recall-Dev": "1" },
+          body: JSON.stringify(raw),
+        });
+        const result = await save.json();
+        if (!save.ok) throw new Error(result.error ?? `save failed (${save.status})`);
+        line(`Saved ${result.records.toLocaleString()} recalls to ${result.path}.`);
+        line(`${result.new.length} new, ${result.changed.length} changed, ${result.removed.length} removed ` +
+             `(${result.skipped_non_english} Spanish duplicates skipped).`);
+        if (result.new.length) line(`New: ${result.new.slice(0, 20).join(", ")}${result.new.length > 20 ? "…" : ""}`);
+        line("Next: review and commit the file.");
+      } catch (err) {
+        line(`Failed: ${err.message}`).className = "notice";
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
