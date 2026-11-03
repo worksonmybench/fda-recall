@@ -6,7 +6,8 @@ export const formatNumber = (n) => fmt.format(n ?? 0);
 
 function el(tag, attrs = {}, text) {
   const node = tag.startsWith("svg:") ? document.createElementNS(SVG_NS, tag.slice(4)) : document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  // style goes through the CSSOM, which a CSP without 'unsafe-inline' still allows.
+  for (const [k, v] of Object.entries(attrs)) k === "style" ? (node.style.cssText = v) : node.setAttribute(k, v);
   if (text !== undefined) node.textContent = text;
   return node;
 }

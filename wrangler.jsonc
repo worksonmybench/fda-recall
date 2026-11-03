@@ -1,0 +1,18 @@
+// Cloudflare Worker serving the static export (dist/) as static assets, with
+// no Worker script. Rebuild dist/ with `python3 -m fda_recall.web.export`,
+// then deploy with `npx wrangler deploy`.
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "fdarecall",
+  "compatibility_date": "2026-10-15",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none",
+  },
+  // wrangler creates the DNS record and certificate for the custom domain.
+  "routes": [{ "pattern": "fdarecall.worksonmybench.dev", "custom_domain": true }],
+  // No *.workers.dev or preview URLs: the account subdomain can identify the owner.
+  "workers_dev": false,
+  "preview_urls": false,
+}

@@ -34,6 +34,8 @@ python -m fda_recall.web.export
 
 writes `dist/`: the `site/` files plus every API response pre-built as a static JSON file at the same URL the dev server uses (`api/states.json`, `api/dashboard/impacting/TX.json`, ...). Upload `dist/` to any static host or CDN (GitHub Pages, Cloudflare Pages, S3 + CloudFront); there's no database or server in production. Re-run the export after each data load.
 
+It's deployed as a Cloudflare Worker with static assets at `fdarecall.worksonmybench.dev` (`wrangler.jsonc`): run `npx wrangler deploy` after exporting. `site/_headers` sets the security headers, including a CSP with no inline scripts or styles, so set inline styles through `element.style` rather than a `style` attribute. `npx wrangler dev` serves `dist/` with those headers locally.
+
 How it fits together:
 
 - `fda_recall/web/endpoints.py` defines each API response as a Python function registered at a path. A path parameter like `{scope}` must come with a function listing its allowed values, which is what lets the export enumerate every file. The dev server refuses values the export wouldn't produce, so dev can't drift from the deployed site.
