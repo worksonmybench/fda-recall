@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recall details · US Food Recalls</title>
+  <meta name="description" content="Details of an FDA or USDA food recall: products, reasons, distribution and firm history.">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="event.js"></script>
+  <script type="module" src="nav.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <nav class="site-nav" aria-label="Site">
+      <a class="brand" href="./">US food recalls</a>
+      <div class="nav-links">
+        <a href="./">Overview</a>
+        <a href="state.html">By state</a>
+        <a href="search.html">Search</a>
+        <a href="about.html">About</a>
+      </div>
+      <form class="nav-search" id="nav-search" role="search">
+        <label for="nav-search-input" class="visually-hidden">Find a recall by number, UPC or event ID</label>
+        <input id="nav-search-input" type="search" placeholder="Recall #, UPC or event ID" autocomplete="off">
+        <button type="submit">Find</button>
+      </form>
+    </nav>
+    <div class="search-results" id="nav-search-results" aria-live="polite"></div>
+
+    <main id="content">
+      <header class="page-header">
+        <h1 id="firm">Loading…</h1>
+        <p class="subtitle" id="event-subtitle"></p>
+      </header>
+
+      <section class="badges" id="badges"></section>
+
+      <div class="grid-2 event-top">
+        <section class="card">
+          <h2>About this recall</h2>
+          <dl class="facts" id="facts"></dl>
+        </section>
+        <section class="card">
+          <h2>Where it was distributed</h2>
+          <p class="card-note" id="reach-note"></p>
+          <div class="chart" id="reach-map"></div>
+          <details><summary>Distribution as recorded by the agency</summary><p class="raw-text" id="distribution-text"></p></details>
+        </section>
+      </div>
+
+      <section class="card" id="notice-card" hidden>
+        <h2>FSIS notice</h2>
+        <p class="card-note">USDA's Food Safety and Inspection Service announcement for this recall.
+          <a id="notice-link" hidden>Read it on the FSIS site →</a></p>
+        <p class="raw-text" id="notice-text"></p>
+      </section>
+
+      <section class="card" id="reason-card">
+        <h2>Why it was recalled</h2>
+        <div id="reasons"></div>
+      </section>
+
+      <section class="card">
+        <h2 id="products-title">Products</h2>
+        <p class="card-note">Each product has its own FDA recall number.</p>
+        <div class="products" id="products"></div>
+      </section>
+
+      <section class="card" id="history-card" hidden>
+        <h2>Other recalls by this firm</h2>
+        <div class="table-scroll" id="firm-history"></div>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      Sources: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a> and the <a href="https://www.fsis.usda.gov/science-data/developer-resources/recall-api">USDA FSIS Recall API</a>.
+      Categories, sizes and locations are derived from the agencies' free-text records and are approximate.
+    </footer>
+  </div>
+</body>
+</html>

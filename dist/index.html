@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Are Food Recalls Rising? · US Food Recalls</title>
+  <meta name="description" content="Are food recalls happening more often, or just getting more attention? FDA and USDA recall data compared with news coverage.">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="home.js"></script>
+  <script type="module" src="nav.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <nav class="site-nav" aria-label="Site">
+      <a class="brand" href="./">US food recalls</a>
+      <div class="nav-links">
+        <a href="./">Overview</a>
+        <a href="state.html">By state</a>
+        <a href="search.html">Search</a>
+        <a href="about.html">About</a>
+      </div>
+      <form class="nav-search" id="nav-search" role="search">
+        <label for="nav-search-input" class="visually-hidden">Find a recall by number, UPC or event ID</label>
+        <input id="nav-search-input" type="search" placeholder="Recall #, UPC or event ID" autocomplete="off">
+        <button type="submit">Find</button>
+      </form>
+    </nav>
+    <div class="search-results" id="nav-search-results" aria-live="polite"></div>
+
+    <main id="content" class="home">
+      <header class="hero">
+        <h1>Are food recalls on the rise?</h1>
+        <p class="lede" id="answer">Loading the numbers…</p>
+        <section class="tiles" id="hero-tiles"></section>
+      </header>
+
+      <section class="card">
+        <h2>Recalls vs. news coverage</h2>
+        <p class="card-note" id="trend-note"></p>
+        <div class="legend" id="trend-legend"></div>
+        <div class="chart" id="trend-chart"></div>
+        <p class="card-note notice" id="media-missing" hidden>News-coverage data hasn't been loaded yet, so only the recall line is shown.</p>
+        <details><summary>Show table</summary><div id="trend-table"></div></details>
+        <p class="more-link"><a href="about.html#news-coverage">How we measure news coverage →</a></p>
+      </section>
+
+      <section class="card">
+        <h2>FDA and USDA recall events per year, by class</h2>
+        <p class="card-note" id="year-note"></p>
+        <div class="legend" id="year-legend"></div>
+        <div class="chart" id="year-chart"></div>
+        <details><summary>Show table</summary><div id="year-table"></div></details>
+      </section>
+
+      <section class="card map-card">
+        <h2>Where recalls are happening now</h2>
+        <p class="card-note">Recall events not yet closed whose distribution reached each state. Nationwide recalls (including online sales) count everywhere. Select a state to explore it.</p>
+        <div class="legend" id="map-legend"></div>
+        <div class="chart map" id="map"></div>
+        <p class="more-link"><a href="state.html">Explore recalls by state →</a></p>
+      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <h2>Why products are recalled</h2>
+          <p class="card-note">Recall events since 2012 involving each reason. Select one to see those recalls.</p>
+          <div class="chart" id="reason-chart"></div>
+        </section>
+        <section class="card">
+          <h2>What gets recalled</h2>
+          <p class="card-note">Recall events since 2012 involving each kind of food. Select one to see those recalls.</p>
+          <div class="chart" id="product-chart"></div>
+        </section>
+      </div>
+
+      <section class="card">
+        <h2>Latest recalls</h2>
+        <div class="recall-cards" id="latest"></div>
+        <p class="more-link"><a href="search.html">See all recalls in search →</a></p>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      Sources: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a> and the <a href="https://www.fsis.usda.gov/science-data/developer-resources/recall-api">USDA FSIS Recall API</a>. <span id="media-credit"></span>
+      Categories, sizes and locations are derived from the agencies' free-text records and are approximate. <a href="about.html">About the data</a>.
+    </footer>
+    <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+  </div>
+</body>
+</html>

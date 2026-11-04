@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About the Data · US Food Recalls</title>
+  <meta name="description" content="Where the recall and news-coverage data comes from, how derived fields are built, and their limits.">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="nav.js"></script>
+</head>
+<body>
+  <div class="viz-root">
+    <nav class="site-nav" aria-label="Site">
+      <a class="brand" href="./">US food recalls</a>
+      <div class="nav-links">
+        <a href="./">Overview</a>
+        <a href="state.html">By state</a>
+        <a href="search.html">Search</a>
+        <a href="about.html">About</a>
+      </div>
+      <form class="nav-search" id="nav-search" role="search">
+        <label for="nav-search-input" class="visually-hidden">Find a recall by number, UPC or event ID</label>
+        <input id="nav-search-input" type="search" placeholder="Recall #, UPC or event ID" autocomplete="off">
+        <button type="submit">Find</button>
+      </form>
+    </nav>
+    <div class="search-results" id="nav-search-results" aria-live="polite"></div>
+
+    <main id="content" class="prose">
+      <h1>About the data</h1>
+
+      <section class="card">
+        <h2>Where the recalls come from</h2>
+        <p>Food recalls in the US come from two agencies, and the site includes both:</p>
+        <ul>
+          <li><strong>FDA</strong> covers most foods. Its recalls come from the <a href="https://open.fda.gov/data/downloads/">food enforcement reports on openFDA</a>, starting in June 2012.</li>
+          <li><strong>USDA</strong>, through its Food Safety and Inspection Service (FSIS), covers meat, poultry and processed egg products. Its recalls come from the <a href="https://www.fsis.usda.gov/science-data/developer-resources/recall-api">FSIS Recall API</a>, starting in 2014. FSIS also issues <em>public health alerts</em>, used when a recall isn't possible (often because the product is no longer for sale); the site counts these with recalls, and they have no class.</li>
+        </ul>
+        <p>The two agencies' records aren't the same shape. FDA lists every product separately with its own recall number, while an FSIS record is a single announcement with a product list and notice text. FSIS records only the year a recall closed, not the date. The site reads the parts of each FSIS notice that differ from recall to recall (what, how much, why, how it was found, any illnesses) and ignores the standard paragraphs every notice includes. Trends are shown per agency, because their counts move very differently: USDA recalls fell by about half after 2019.</p>
+      </section>
+
+      <section class="card">
+        <h2>Recall events, products and classes</h2>
+        <p>A <strong>recall event</strong> is one firm's recall announcement. It often covers several <strong>products</strong>, each with its own FDA recall number. Most counts on this site are events, so one announcement counts once however many products it covers.</p>
+        <p>Both agencies use the same three classes:</p>
+        <ul>
+          <li><strong>Class I:</strong> a reasonable chance the product will cause serious health problems or death.</li>
+          <li><strong>Class II:</strong> the product may cause temporary or medically reversible health problems, or serious problems are unlikely.</li>
+          <li><strong>Class III:</strong> the product is unlikely to cause health problems, but breaks FDA rules.</li>
+        </ul>
+        <p>An event's class is the most serious class among its products. An event is <strong>ongoing</strong> until FDA has closed all of its products.</p>
+      </section>
+
+      <section class="card">
+        <h2>How the derived fields work</h2>
+        <p>FDA's records describe most things in free text. The site derives these fields from that text with rules, so they're approximate:</p>
+        <ul>
+          <li><strong>Why it was recalled:</strong> pathogen, undeclared allergen, foreign material and so on, read from the reason text. About 97% of products get a category.</li>
+          <li><strong>Kind of food:</strong> read from the product name. About 94% of products get one; the rest name only a brand.</li>
+          <li><strong>Size:</strong> the quantity text converted to rough retail units (a case of 12 unless the text says otherwise, 1 lb as 1 unit), bucketed from XS (under 100) to XXL (a million or more). Only the order of magnitude is meaningful.</li>
+          <li><strong>States reached:</strong> the states named in the distribution text. Recalls described as nationwide, or sold online, count in every state.</li>
+          <li><strong>Illnesses reported:</strong> set only when the text says illnesses or reactions actually happened, not when it warns they could.</li>
+        </ul>
+      </section>
+
+      <section class="card" id="news-coverage">
+        <h2>How news coverage is measured</h2>
+        <p>News coverage comes from the <a href="https://developer.nytimes.com">New York Times Archive API</a>, which lists everything the Times published each month along with the subject tags its editors assign. We count articles tagged <em>Food Contamination and Poisoning</em>, plus articles tagged <em>Recalls and Bans of Products</em> that also carry a food tag (such as Food, Salmonella, E. coli or Peanuts; an FDA tag alone doesn't count, since FDA also regulates e-cigarettes), and divide by all articles that month. Dividing matters: the Times publishes about half as many articles now as in 2013. The chart shows that share per year, indexed to 2014 = 100 alongside the recall counts.</p>
+        <p><strong>Limits:</strong> it's one publication, and it covers outbreaks and food-safety stories as well as recalls themselves, which is the attention we're interested in but isn't only recalls. It measures coverage, not how many people saw it. It covers FDA and USDA recalls alike, which is why both agencies are on the chart. The numbers are small (a few articles a month), so treat year-to-year changes as a direction, not an exact measure.</p>
+        <p>News coverage data provided by The New York Times.</p>
+      </section>
+
+      <section class="card">
+        <h2>Partial years</h2>
+        <p>FDA's data starts on June 20, 2012 and USDA's in January 2014, and the current year is incomplete. Year-by-year comparisons count recall events per month, so partial years line up with full ones, and the trend chart is indexed to 2014, the first year with both agencies. Charts mark partial years.</p>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      Sources: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a> and the <a href="https://www.fsis.usda.gov/science-data/developer-resources/recall-api">USDA FSIS Recall API</a>.
+    </footer>
+  </div>
+</body>
+</html>

@@ -34,7 +34,17 @@ python -m fda_recall.web.export
 
 writes `dist/`: the `site/` files plus every API response pre-built as a static JSON file at the same URL the dev server uses (`api/states.json`, `api/dashboard/impacting/TX.json`, ...). Upload `dist/` to any static host or CDN (GitHub Pages, Cloudflare Pages, S3 + CloudFront); there's no database or server in production. Re-run the export after each data load.
 
-It's deployed as a Cloudflare Worker with static assets at `fdarecall.worksonmybench.dev` (`wrangler.jsonc`): run `npx wrangler deploy` after exporting. `site/_headers` sets the security headers, including a CSP with no inline scripts or styles, so set inline styles through `element.style` rather than a `style` attribute. `npx wrangler dev` serves `dist/` with those headers locally.
+It's deployed as a Cloudflare Worker with static assets at `fdarecall.worksonmybench.dev` (`wrangler.jsonc`). `site/_headers` sets the security headers, including a CSP with no inline scripts or styles, so set inline styles through `element.style` rather than a `style` attribute. `npx wrangler dev` serves `dist/` with those headers locally.
+
+### Refresh and deploy
+
+`dist/` is committed, and every push to `main` deploys it (`.github/workflows/deploy.yml`, which needs the repo secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`). All data is fetched and built locally, so CI makes no calls to FDA, USDA or the NYT. CI runs the tests and fails if `dist/`'s copies of the `site/` files are out of date, so re-export after changing a page. The export is deterministic, so a refresh commit only touches files whose data changed.
+
+1. Replace the openFDA export in this folder with the latest `food-enforcement-0001-of-0001.json.zip` from https://open.fda.gov/data/downloads/.
+2. Refresh `sources/usda/fsis_recalls.json` from the dev server (see [USDA recall data](#usda-recall-data)).
+3. `python3 -m fda_recall.load`, then `NYT_API_KEY=... python3 -m fda_recall.media fetch`
+4. `python3 -m fda_recall.web.export`
+5. Commit `sources/usda/` and `dist/`, and push.
 
 How it fits together:
 
