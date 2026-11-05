@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Are Food Recalls Rising? · US Food Recalls</title>
   <meta name="description" content="Are food recalls happening more often, or just getting more attention? FDA and USDA recall data compared with news coverage.">
+  <script src="theme.js"></script>
+  <link rel="icon" type="image/svg+xml" sizes="any" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="home.js"></script>
   <script type="module" src="nav.js"></script>
@@ -13,7 +15,7 @@
 <body>
   <div class="viz-root">
     <nav class="site-nav" aria-label="Site">
-      <a class="brand" href="./">US food recalls</a>
+      <a class="brand" href="./"><img src="favicon.svg" width="26" height="26" alt="">US food recalls</a>
       <div class="nav-links">
         <a href="./">Overview</a>
         <a href="state.html">By state</a>
@@ -57,6 +59,7 @@
         <h2>Where recalls are happening now</h2>
         <p class="card-note">Recall events not yet closed whose distribution reached each state. Nationwide recalls (including online sales) count everywhere. Select a state to explore it.</p>
         <div class="legend" id="map-legend"></div>
+        <p class="map-hint">Select a state to explore its recalls. Equal-size tiles; positions approximate.</p>
         <div class="chart map" id="map"></div>
         <p class="more-link"><a href="state.html">Explore recalls by state →</a></p>
       </section>
@@ -82,8 +85,17 @@
     </main>
 
     <footer class="page-footer">
-      Sources: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a> and the <a href="https://www.fsis.usda.gov/science-data/developer-resources/recall-api">USDA FSIS Recall API</a>. <span id="media-credit"></span>
-      Categories, sizes and locations are derived from the agencies' free-text records and are approximate. <a href="about.html">About the data</a>.
+      <p class="footer-sources">Sources: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a> and the <a href="https://www.fsis.usda.gov/science-data/developer-resources/recall-api">USDA FSIS Recall API</a>. <span id="media-credit"></span>
+      Categories, sizes and locations are derived from the agencies' free-text records and are approximate. <a href="about.html">About the data</a>.</p>
+      <div class="footer-settings">
+        <label class="theme-control" for="theme-select">Theme
+          <select id="theme-select">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+      </div>
     </footer>
     <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
   </div>

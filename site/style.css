@@ -1,62 +1,62 @@
 /* Tokens: reference data-viz palette (light + selected dark steps). */
 .viz-root {
   color-scheme: light;
-  --page: #f9f9f7;
-  --surface-1: #fcfcfb;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
-  --grid: #e1e0d9;
-  --baseline: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.10);
+  --page: #f5f6f8;
+  --surface-1: #ffffff;
+  --text-primary: #17212f;
+  --text-secondary: #526174;
+  --text-muted: #667589;
+  --grid: #dce2e9;
+  --baseline: #adb9c8;
+  --border: #dce2e9;
   --series-1: #2a78d6;
   /* Ordinal ramp for recall class: Class I is the strongest step. */
   --class-1: #184f95;
   --class-2: #3987e5;
   --class-3: #86b6ef;
-  --link: #256abf;
+  --link: #245faf;
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) .viz-root {
     color-scheme: dark;
-    --page: #0d0d0d;
-    --surface-1: #1a1a19;
-    --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted: #898781;
-    --grid: #2c2c2a;
-    --baseline: #383835;
-    --border: rgba(255, 255, 255, 0.10);
+    --page: #111820;
+    --surface-1: #1a2430;
+    --text-primary: #e8edf4;
+    --text-secondary: #adb9c8;
+    --text-muted: #99a9bd;
+    --grid: #2b3949;
+    --baseline: #334155;
+    --border: #334155;
     --series-1: #3987e5;
     --class-1: #9ec5f4;
     --class-2: #5598e7;
     --class-3: #1c5cab;
-    --link: #86b6ef;
+    --link: #8ab9f5;
   }
 }
 :root[data-theme="dark"] .viz-root {
   color-scheme: dark;
-  --page: #0d0d0d;
-  --surface-1: #1a1a19;
-  --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted: #898781;
-  --grid: #2c2c2a;
-  --baseline: #383835;
-  --border: rgba(255, 255, 255, 0.10);
+  --page: #111820;
+  --surface-1: #1a2430;
+  --text-primary: #e8edf4;
+  --text-secondary: #adb9c8;
+  --text-muted: #99a9bd;
+  --grid: #2b3949;
+  --baseline: #334155;
+  --border: #334155;
   --series-1: #3987e5;
   --class-1: #9ec5f4;
   --class-2: #5598e7;
   --class-3: #1c5cab;
-  --link: #86b6ef;
+  --link: #8ab9f5;
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { margin: 0; }
-body { background: #f9f9f7; }
-@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) body { background: #0d0d0d; } }
-:root[data-theme="dark"] body { background: #0d0d0d; }
+body { background: #f5f6f8; }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) body { background: #111820; } }
+:root[data-theme="dark"] body { background: #111820; }
 
 .viz-root {
   background: var(--page);
@@ -69,11 +69,12 @@ body { background: #f9f9f7; }
 }
 a { color: var(--link); }
 h1 { font-size: 28px; font-weight: 600; margin: 0 0 4px; }
-h2 { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
+h2 { font-size: 19px; font-weight: 600; margin: 0 0 2px; }
 .subtitle, .card-note, .page-footer { color: var(--text-secondary); }
 .subtitle { margin: 0; }
 .card-note { margin: 0 0 12px; font-size: 13px; }
-.page-footer { font-size: 13px; margin-top: 32px; }
+.page-footer { font-size: 13px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--grid); display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 32px; }
+.footer-sources { flex: 1 1 480px; max-width: 820px; margin: 0; line-height: 1.6; }
 
 .filters {
   display: flex; align-items: center; gap: 8px;
@@ -85,7 +86,8 @@ h2 { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
   border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; min-width: 180px;
 }
 
-main.loading { opacity: 0.55; transition: opacity 120ms; }
+/* A shadow, not a border, so the content doesn't shift while loading. */
+main.loading { box-shadow: 0 -2px 0 var(--link); }
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .tile, .card {
@@ -93,13 +95,13 @@ main.loading { opacity: 0.55; transition: opacity 120ms; }
 }
 .tile { padding: 14px 16px; }
 .tile .label { color: var(--text-secondary); font-size: 13px; }
-.tile .value { font-size: 28px; font-weight: 600; margin-top: 2px; }
+.tile .value { font-variant-numeric: tabular-nums; font-size: 34px; font-weight: 600; margin-top: 2px; }
 .tile .sub { color: var(--text-muted); font-size: 12px; }
 
-.card { padding: 16px; margin-bottom: 16px; min-width: 0; }
-.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px; }
+.card { padding: 24px; margin-bottom: 24px; min-width: 0; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 24px; }
 .grid-2 .card { margin-bottom: 0; }
-.grid-2 { margin-bottom: 16px; }
+.grid-2 { margin-bottom: 24px; }
 
 .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
 .legend .key { display: inline-flex; align-items: center; gap: 6px; }
@@ -152,8 +154,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
    --seq-0 is "none" (neutral gray); --seq-ink-N is the label color that clears contrast on step N.
    --seq-5-strong is the blue control fill (toggle, pager), deliberately not part of the ramp. */
 .viz-root {
-  --seq-0: #f0efec; --seq-ink-0: #52514e;
-  --seq-5-strong: #256abf; /* selected-control fill: white text clears 4.5:1 */
+  --seq-0: #f0efec; --seq-ink-0: #526174;
+  --seq-5-strong: #245faf; /* selected-control fill: white text clears 4.5:1 */
   --seq-1: #fde4df; --seq-ink-1: #0b0b0b;
   --seq-2: #f9b9ad; --seq-ink-2: #0b0b0b;
   --seq-3: #f2877a; --seq-ink-3: #0b0b0b;
@@ -163,8 +165,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) .viz-root {
-    --seq-0: #383835; --seq-ink-0: #c3c2b7;
-    --seq-5-strong: #1c5cab;
+    --seq-0: #334155; --seq-ink-0: #adb9c8;
+    --seq-5-strong: #245faf;
     --seq-1: #fde4df; --seq-ink-1: #0b0b0b;
     --seq-2: #f9b9ad; --seq-ink-2: #0b0b0b;
     --seq-3: #f2877a; --seq-ink-3: #0b0b0b;
@@ -174,8 +176,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 }
 :root[data-theme="dark"] .viz-root {
-  --seq-0: #383835; --seq-ink-0: #c3c2b7;
-  --seq-5-strong: #1c5cab;
+  --seq-0: #334155; --seq-ink-0: #adb9c8;
+  --seq-5-strong: #245faf;
   --seq-1: #fde4df; --seq-ink-1: #0b0b0b;
   --seq-2: #f9b9ad; --seq-ink-2: #0b0b0b;
   --seq-3: #f2877a; --seq-ink-3: #0b0b0b;
@@ -201,7 +203,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .segmented label { position: relative; }
 .segmented input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
 .segmented span { display: block; padding: 5px 12px; border-radius: 6px; font-size: 14px; color: var(--text-secondary); }
-.segmented input:checked + span { background: var(--seq-5-strong, #256abf); color: #ffffff; font-weight: 600; }
+.segmented input:checked + span { background: var(--seq-5-strong, #245faf); color: #ffffff; font-weight: 600; }
 .segmented input:focus-visible + span { outline: 2px solid var(--text-primary); outline-offset: 1px; }
 .visually-hidden {
   position: absolute !important; width: 1px; height: 1px; overflow: hidden;
@@ -294,14 +296,14 @@ table.results .snippet { color: var(--text-secondary); font-size: 12px; margin-t
 
 /* --- site nav (every page) ------------------------------------------------------ */
 .viz-root { --series-2: #eb6834; }
-@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .viz-root { --series-2: #d95926; } }
-:root[data-theme="dark"] .viz-root { --series-2: #d95926; }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .viz-root { --series-2: #f49a70; } }
+:root[data-theme="dark"] .viz-root { --series-2: #f49a70; }
 
 .site-nav {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
   padding-bottom: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--grid);
 }
-.site-nav .brand { font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 16px; }
+.site-nav .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-primary); text-decoration: none; font-size: 16px; }
 .site-nav .nav-links { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 15px; }
 .site-nav .nav-links a { color: var(--text-secondary); text-decoration: none; padding: 2px 0; border-bottom: 2px solid transparent; }
 .site-nav .nav-links a:hover { color: var(--text-primary); }
@@ -321,12 +323,12 @@ table.results .snippet { color: var(--text-secondary); font-size: 12px; margin-t
 
 /* --- home ----------------------------------------------------------------------------- */
 .hero { margin-bottom: 20px; }
-.hero h1 { font-size: 32px; line-height: 1.2; margin-bottom: 10px; }
+.hero h1 { font-size: clamp(30px, 4vw, 38px); letter-spacing: -0.025em; line-height: 1.2; margin-bottom: 10px; }
 .lede { font-size: 18px; line-height: 1.5; max-width: 760px; margin: 0 0 16px; color: var(--text-primary); }
 .notice { border-left: 3px solid var(--baseline); padding-left: 10px; }
 .recall-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 12px; }
-.recall-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
-.recall-card h3 { font-size: 15px; margin: 4px 0 0; overflow-wrap: anywhere; }
+.recall-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+.recall-card h3 { font-size: 16px; line-height: 1.4; margin: 8px 0; overflow-wrap: anywhere; }
 .recall-card .chip { align-self: flex-start; }
 .recall-card p { margin: 0; }
 .recall-card .reason { font-size: 14px; overflow-wrap: anywhere; }
@@ -352,7 +354,63 @@ table.results .snippet { color: var(--text-secondary); font-size: 12px; margin-t
    news coverage = series-2 orange, USDA = series-3 aqua. "No class" (USDA public
    health alerts, not-yet-classified FDA recalls) is a neutral gray in class charts. */
 .viz-root { --series-3: #1baf7a; --unclassified: #b4b2a9; }
-@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .viz-root { --series-3: #199e70; --unclassified: #6b6a65; } }
-:root[data-theme="dark"] .viz-root { --series-3: #199e70; --unclassified: #6b6a65; }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .viz-root { --series-3: #55c79e; --unclassified: #6b6a65; } }
+:root[data-theme="dark"] .viz-root { --series-3: #55c79e; --unclassified: #6b6a65; }
 .agency-tag { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; padding: 1px 6px; border-radius: 4px;
   border: 1px solid var(--border); color: var(--text-secondary); white-space: nowrap; }
+
+/* Shared controls and interaction states. */
+input[type="search"], input[type="date"], select,
+.nav-search button, .search button { min-height: 40px; }
+button, input, select { accent-color: var(--seq-5-strong); }
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 3px;
+}
+.nav-search button:hover, .search button:hover { filter: brightness(1.12); }
+input::placeholder { color: var(--text-muted); opacity: 1; }
+table.results tbody tr:hover { background: var(--page); }
+.footer-settings { flex: 0 0 auto; }
+.theme-control { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+.theme-control select {
+  font: inherit; color: var(--text-primary); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px;
+}
+@media (max-width: 560px) {
+  .card { padding: 16px; }
+}
+
+/* Scannable recall cards and search rows. */
+.recall-card .chips { margin-top: 0; align-items: center; }
+.recall-card .reason { padding-bottom: 12px; }
+.recall-card .recall-meta { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--grid); color: var(--text-secondary); line-height: 1.6; }
+#results { max-height: 70vh; padding: 0; scroll-padding-top: 48px; }
+table.results { margin-top: 0; border-collapse: separate; border-spacing: 0; }
+table.results th, table.results td { padding: 12px 14px; }
+table.results th { position: sticky; top: 0; z-index: 1; background: var(--surface-1); box-shadow: 0 1px 0 var(--grid); }
+table.results .firm-product > a { font-weight: 600; font-size: 14px; }
+table.results .snippet { margin-top: 6px; line-height: 1.5; }
+table.results tbody tr:focus-within { background: var(--page); }
+
+/* Interactive marks have a visible edge for mouse and keyboard navigation. */
+.map-hint { font-size: 13px; color: var(--text-secondary); margin: 0 0 12px; }
+.tile-map .tile:hover rect { stroke: var(--text-primary); stroke-width: 2; paint-order: stroke; }
+.hbars a.bar:hover, .hbars a.bar:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+.chart .hit:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+
+/* Initial placeholders reserve room while data loads. */
+.skeleton { min-height: 100px; border-radius: 10px; background: var(--grid); animation: skeleton-pulse 1.6s ease-in-out infinite alternate; }
+.chart > .skeleton { width: 100%; height: 260px; }
+.recall-cards > .skeleton { height: 220px; }
+#results > .skeleton { height: 280px; margin: 16px; }
+.loading-text { position: relative; min-height: 1.5em; }
+.loading-text::after { content: ""; position: absolute; inset: 0; border-radius: 6px; background: var(--grid); }
+@keyframes skeleton-pulse { from { opacity: .45; } to { opacity: .85; } }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+  .tile-map .tile rect { transition: none; }
+}
+
+.map-inset-divider { stroke: var(--grid); stroke-width: 1; }
+.map-inset-label { fill: var(--text-secondary); font-size: 11px; }

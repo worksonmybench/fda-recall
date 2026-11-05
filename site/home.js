@@ -5,6 +5,9 @@ import {
 } from "./charts.js";
 import { label } from "./labels.js";
 import { renderMapLegend, renderTileMap } from "./map.js";
+import { showPlaceholders } from "./loading.js";
+
+const clearPlaceholders = showPlaceholders();
 
 const $ = (id) => document.getElementById(id);
 const pct = (share) => `${Math.round(share * 100)}%`;
@@ -176,8 +179,8 @@ function renderLatest(d) {
     card.append(
       tags,
       title,
-      node("p", { class: "muted small" }, meta),
       node("p", { class: "reason" }, reason),
+      node("p", { class: "recall-meta small" }, meta),
     );
     return card;
   }));
@@ -207,4 +210,4 @@ async function init() {
 
 init().catch((err) => {
   $("answer").textContent = `Couldn't load data: ${err.message}`;
-});
+}).finally(clearPlaceholders);

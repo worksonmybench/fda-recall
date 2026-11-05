@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Recall details · US Food Recalls</title>
   <meta name="description" content="Details of an FDA or USDA food recall: products, reasons, distribution and firm history.">
+  <script src="theme.js"></script>
+  <link rel="icon" type="image/svg+xml" sizes="any" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="event.js"></script>
   <script type="module" src="nav.js"></script>
@@ -13,7 +15,7 @@
 <body>
   <div class="viz-root">
     <nav class="site-nav" aria-label="Site">
-      <a class="brand" href="./">US food recalls</a>
+      <a class="brand" href="./"><img src="favicon.svg" width="26" height="26" alt="">US food recalls</a>
       <div class="nav-links">
         <a href="./">Overview</a>
         <a href="state.html">By state</a>
@@ -74,8 +76,17 @@
     </main>
 
     <footer class="page-footer">
-      Sources: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a> and the <a href="https://www.fsis.usda.gov/science-data/developer-resources/recall-api">USDA FSIS Recall API</a>.
-      Categories, sizes and locations are derived from the agencies' free-text records and are approximate.
+      <p class="footer-sources">Sources: <a href="https://open.fda.gov/data/downloads/">openFDA food enforcement reports</a> and the <a href="https://www.fsis.usda.gov/science-data/developer-resources/recall-api">USDA FSIS Recall API</a>.
+      Categories, sizes and locations are derived from the agencies' free-text records and are approximate.</p>
+      <div class="footer-settings">
+        <label class="theme-control" for="theme-select">Theme
+          <select id="theme-select">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+      </div>
     </footer>
   </div>
 </body>

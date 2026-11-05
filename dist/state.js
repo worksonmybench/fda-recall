@@ -5,7 +5,9 @@ import {
 } from "./charts.js";
 import { MAP_CODES, renderMapLegend, renderTileMap } from "./map.js";
 import { AGENCY_NAMES, label } from "./labels.js";
+import { showPlaceholders } from "./loading.js";
 
+const clearPlaceholders = showPlaceholders();
 
 const CLASS_SERIES = [
   { key: "class_1", label: "Class I", color: "--class-1" },
@@ -153,11 +155,13 @@ const eventUrl = (id) => `event.html?id=${encodeURIComponent(id)}`;
 
 async function loadDashboard() {
   const main = $("content");
-  main.classList.add("loading"); // keep the previous render visible while fetching
+  main.classList.add("loading"); // retain the previous data while fetching
+  main.setAttribute("aria-busy", "true");
   try {
     renderDashboard(await getJSON(`dashboard/${state.agency}/${state.view}/${state.scope}`));
   } finally {
     main.classList.remove("loading");
+    main.removeAttribute("aria-busy");
   }
 }
 
@@ -173,7 +177,7 @@ function selectScope(scope) {
   writeHash();
   renderMap();
   loadDashboard();
-  if (scope !== "US") $("scope-heading").scrollIntoView({ behavior: "smooth", block: "start" });
+  if (scope !== "US") $("scope-heading").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
 }
 
 async function selectAgency(agency) {
@@ -239,4 +243,4 @@ async function init() {
 
 init().catch((err) => {
   $("content").textContent = `Couldn't load data: ${err.message}`;
-});
+}).finally(clearPlaceholders);

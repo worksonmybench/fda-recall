@@ -3,6 +3,9 @@
 // URL query string so searches can be shared and bookmarked.
 import { formatNumber } from "./charts.js";
 import { LABELS, label } from "./labels.js";
+import { showPlaceholders } from "./loading.js";
+
+const clearPlaceholders = showPlaceholders();
 
 const PAGE_SIZE = 50;
 const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "unknown"];
@@ -149,13 +152,13 @@ function renderResults(results) {
   const table = node("table", { class: "results" });
   const head = node("tr");
   for (const [h, cls] of [["Reported", ""], ["Agency", ""], ["Firm and product", ""], ["Reason", ""], ["Class", ""], ["Size", ""], ["Reach", ""], ["Products", "num"]]) {
-    head.append(node("th", cls ? { class: cls } : {}, h));
+    head.append(node("th", { scope: "col", ...(cls ? { class: cls } : {}) }, h));
   }
   table.append(node("thead"), node("tbody"));
   table.tHead.append(head);
   for (const e of shown) {
     const tr = node("tr");
-    const firm = node("td");
+    const firm = node("td", { class: "firm-product" });
     firm.append(node("a", { href: `event.html?id=${encodeURIComponent(e.id)}` }, e.firm));
     if (e.snippet) firm.append(node("div", { class: "snippet" }, e.snippet));
     tr.append(
@@ -253,4 +256,4 @@ async function init() {
 
 init().catch((err) => {
   $("data-updated").textContent = `Couldn't load the recall index: ${err.message}`;
-});
+}).finally(clearPlaceholders);

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>US food recalls</title>
+  <!-- Broad, solid shapes remain recognizable at browser-tab sizes. -->
+  <path fill="#3987e5" d="M16 9C15 5 18 2 23 2c0 4-3 7-7 7Zm0 2c-3-2-7-2-10 0-5 3-4 10-1 15 2 4 5 5 8 4 2-1 4-1 6 0 3 1 6-1 8-5 3-6 3-12-2-15-3-1-6-1-9 1Z"/>
+  <!-- The clear halo separates the alert dot from the apple in either theme. -->
+  <circle cx="26" cy="9" r="6" fill="#f5f6f8"/>
+  <circle cx="26" cy="9" r="4.5" fill="#eb6834"/>
+</svg>

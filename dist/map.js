@@ -4,23 +4,28 @@ import { formatNumber, hideTooltip, showTooltip } from "./charts.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-// [code, column, row]
+// [code, column, row]. Preserve regional neighbors where square tiles allow:
+// NY sits west of New England; PA/NJ and VA/MD/DE form the Mid-Atlantic coast,
+// with DC between MD and VA. The detached bottom row is an inset, not a
+// geographic position.
 const LAYOUT = [
-  ["AK", 0, 0], ["ME", 11, 0],
-  ["VT", 10, 1], ["NH", 11, 1],
-  ["WA", 1, 2], ["ID", 2, 2], ["MT", 3, 2], ["ND", 4, 2], ["MN", 5, 2], ["IL", 6, 2], ["WI", 7, 2],
-  ["MI", 8, 2], ["NY", 9, 2], ["RI", 10, 2], ["MA", 11, 2],
-  ["OR", 1, 3], ["NV", 2, 3], ["WY", 3, 3], ["SD", 4, 3], ["IA", 5, 3], ["IN", 6, 3], ["OH", 7, 3],
-  ["PA", 8, 3], ["NJ", 9, 3], ["CT", 10, 3],
-  ["CA", 1, 4], ["UT", 2, 4], ["CO", 3, 4], ["NE", 4, 4], ["MO", 5, 4], ["KY", 6, 4], ["WV", 7, 4],
-  ["VA", 8, 4], ["MD", 9, 4], ["DE", 10, 4],
-  ["AZ", 2, 5], ["NM", 3, 5], ["KS", 4, 5], ["AR", 5, 5], ["TN", 6, 5], ["NC", 7, 5], ["SC", 8, 5], ["DC", 9, 5],
-  ["OK", 4, 6], ["LA", 5, 6], ["MS", 6, 6], ["AL", 7, 6], ["GA", 8, 6],
-  ["HI", 0, 7], ["TX", 4, 7], ["FL", 9, 7], ["PR", 11, 7],
-  ["GU", 0, 8], ["MP", 1, 8], ["AS", 2, 8], ["VI", 11, 8],
+  ["ME", 11, 0],
+  ["VT", 9, 1], ["NH", 10, 1],
+  ["WA", 1, 2], ["ID", 2, 2], ["MT", 3, 2], ["ND", 4, 2], ["MN", 5, 2], ["WI", 6, 2],
+  ["MI", 7, 2], ["NY", 8, 2], ["CT", 9, 2], ["MA", 10, 2], ["RI", 11, 2],
+  ["OR", 1, 3], ["NV", 2, 3], ["WY", 3, 3], ["SD", 4, 3], ["IA", 5, 3], ["IL", 6, 3],
+  ["IN", 7, 3], ["OH", 8, 3], ["PA", 9, 3], ["NJ", 10, 3],
+  ["CA", 1, 4], ["UT", 2, 4], ["CO", 3, 4], ["NE", 4, 4], ["KS", 5, 4], ["MO", 6, 4],
+  ["KY", 7, 4], ["WV", 8, 4], ["VA", 9, 4], ["MD", 10, 4], ["DE", 11, 4],
+  ["AZ", 3, 5], ["NM", 4, 5], ["OK", 5, 5], ["AR", 6, 5], ["TN", 7, 5], ["NC", 8, 5],
+  ["SC", 9, 5], ["DC", 10, 5],
+  ["TX", 5, 6], ["LA", 6, 6], ["MS", 7, 6], ["AL", 8, 6], ["GA", 9, 6],
+  ["FL", 9, 7],
+  ["AK", 0, 9], ["HI", 1, 9],
+  ["PR", 4, 9], ["VI", 5, 9], ["GU", 6, 9], ["MP", 7, 9], ["AS", 8, 9],
 ];
 const COLS = 12;
-const ROWS = 9;
+const ROWS = 10;
 const BINS = 6; // --seq-1 .. --seq-6; zero gets --seq-0
 
 function el(tag, attrs = {}, text) {
@@ -28,6 +33,22 @@ function el(tag, attrs = {}, text) {
   for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+// Both interactive and recall-detail maps use the same inset treatment.
+function appendInsetGuide(svg, size, gap) {
+  const pitch = size + gap;
+  svg.append(el("line", {
+    x1: 0, x2: COLS * pitch - gap, y1: 8.25 * pitch, y2: 8.25 * pitch,
+    class: "map-inset-divider", "aria-hidden": "true",
+  }));
+  if (size >= 22) {
+    for (const [text, col] of [["AK / HI", 0], ["Territories", 4]]) {
+      svg.append(el("text", {
+        x: col * pitch, y: 8.8 * pitch, class: "map-inset-label", "aria-hidden": "true",
+      }, text));
+    }
+  }
 }
 
 function niceRound(v) {
@@ -88,6 +109,8 @@ export function renderTileMap(container, { states, view, selected, metric = "ong
     width: mapW, height: mapH, viewBox: `0 0 ${mapW} ${mapH}`, class: "tile-map",
     role: "group", "aria-label": "Map of US states; select a state to see its recalls",
   });
+
+  appendInsetGuide(svg, size, gap);
 
   LAYOUT.forEach(([code, col, row], i) => {
     const info = states[code];
@@ -174,6 +197,7 @@ export function renderReachMap(container, { states = [], nationwide = false, nam
     width: mapW, height: mapH, viewBox: `0 0 ${mapW} ${mapH}`, class: "tile-map reach-map", role: "img",
     "aria-label": nationwide ? "Distributed nationwide" : `Distributed to ${reached.size} states and territories`,
   });
+  appendInsetGuide(svg, size, gap);
   for (const [code, col, row] of LAYOUT) {
     // Nationwide covers the 50 states + DC, not the territories.
     const on = reached.has(code) || (nationwide && !["PR", "GU", "VI", "AS", "MP"].includes(code));

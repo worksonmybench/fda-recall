@@ -3,6 +3,9 @@
 import { formatNumber, renderTable } from "./charts.js";
 import { label, titleCase } from "./labels.js";
 import { renderReachMap } from "./map.js";
+import { showPlaceholders } from "./loading.js";
+
+const clearPlaceholders = showPlaceholders();
 
 const $ = (id) => document.getElementById(id);
 
@@ -205,4 +208,4 @@ init().catch((err) => {
   for (const id of ["badges", "reason-card", "history-card"]) $(id).hidden = true;
   document.querySelector(".event-top").hidden = true;
   $("products").closest(".card").hidden = true;
-});
+}).finally(clearPlaceholders);
